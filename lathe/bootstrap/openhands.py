@@ -1,12 +1,23 @@
 """
-OpenHands bootstrap adapter.
+OpenHands bootstrap executor.
 
-This module exists so OpenHands can be removed later
-without refactoring the core of The Lathe.
+This module allows OpenHands to act as a temporary
+task executor during The Lathe bootstrap phase.
 """
 
-BOOTSTRAP_PROVIDER = "openhands"
+from lathe.core.executor import BootstrapExecutor
+from lathe.core.task import TaskSpec
+from lathe.core.result import TaskResult
 
 
-def get_provider_name() -> str:
-    return BOOTSTRAP_PROVIDER
+class OpenHandsExecutor(BootstrapExecutor):
+    def execute(self, task: TaskSpec) -> TaskResult:
+        # Placeholder: actual OpenHands integration happens later
+        return TaskResult(
+            task_id=task.id,
+            success=False,
+            summary="OpenHands execution not yet implemented.",
+            files_changed=[],
+            commands_run=[],
+            artifacts={},
+        )
