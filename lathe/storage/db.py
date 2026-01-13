@@ -2,7 +2,7 @@ import json
 import sqlite3
 from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict
 
 from lathe.core.task import TaskSpec
 from lathe.core.result import TaskResult
@@ -19,11 +19,14 @@ class LatheDB:
     def _ensure_db(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
             with open("lathe/storage/schema.sql", "r", encoding="utf-8") as f:
                 conn.executescript(f.read())
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.db_path)
+
+    # --- Write paths (existing) ---
 
     def log_task(self, task: TaskSpec) -> None:
         with self._connect() as conn:
@@ -62,10 +65,30 @@ class LatheDB:
                 ),
             )
 
-    def get_task(self, task_id: str) -> Optional[dict]:
+    # --- Read paths (NEW) ---
+
+    def list_tasks(self) -> List[Dict]:
         with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.execute(
+                "SELECT id, goal, created_at FROM tasks ORDER BY created_at DESC"
+            )
+            return [dict(row) for row in cur.fetchall()]
+
+    def get_task(self, task_id: str) -> Optional[Dict]:
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
             cur = conn.execute(
                 "SELECT * FROM tasks WHERE id = ?", (task_id,)
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
+
+    def get_result(self, task_id: str) -> Optional[Dict]:
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.execute(
+                "SELECT * FROM results WHERE task_id = ?", (task_id,)
             )
             row = cur.fetchone()
             return dict(row) if row else None
