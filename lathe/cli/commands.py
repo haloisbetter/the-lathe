@@ -18,26 +18,33 @@ def show_task(db: LatheDB, task_id: str) -> None:
         print(f"Task not found: {task_id}")
         return
 
-    result = db.get_result(task_id)
+    runs = db.list_runs(task_id)
 
     print("Task:")
     for k, v in task.items():
         print(f"  {k}: {v}")
 
-    print("\nResult:")
-    if not result:
-        print("  (no result recorded)")
+    print("\nRuns:")
+    if not runs:
+        print("  (no runs yet)")
         return
 
-    for k, v in result.items():
+    for r in runs:
+        print(f"  Run {r['run_id']} | success={r['success']} | {r['completed_at']}")
+
+
+def show_run(db: LatheDB, run_id: int) -> None:
+    run = db.get_run(run_id)
+    if not run:
+        print(f"Run not found: {run_id}")
+        return
+
+    print("Run:")
+    for k, v in run.items():
         print(f"  {k}: {v}")
 
 
 def replay_task(db: LatheDB, orchestrator: Orchestrator, task_id: str) -> None:
-    """
-    Load a TaskSpec from DB and re-run it through the orchestrator.
-    Note: With the current schema, replay overwrites the prior result for the same task_id.
-    """
     task = db.load_task_spec(task_id)
     if not task:
         print(f"Task not found: {task_id}")
