@@ -26,7 +26,7 @@ class LatheDB:
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.db_path)
 
-    # --- Write paths (existing) ---
+    # --- Write paths ---
 
     def log_task(self, task: TaskSpec) -> None:
         with self._connect() as conn:
@@ -65,7 +65,7 @@ class LatheDB:
                 ),
             )
 
-    # --- Read paths (NEW) ---
+    # --- Read paths ---
 
     def list_tasks(self) -> List[Dict]:
         with self._connect() as conn:
@@ -78,17 +78,45 @@ class LatheDB:
     def get_task(self, task_id: str) -> Optional[Dict]:
         with self._connect() as conn:
             conn.row_factory = sqlite3.Row
-            cur = conn.execute(
-                "SELECT * FROM tasks WHERE id = ?", (task_id,)
-            )
+            cur = conn.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
             row = cur.fetchone()
             return dict(row) if row else None
 
     def get_result(self, task_id: str) -> Optional[Dict]:
         with self._connect() as conn:
             conn.row_factory = sqlite3.Row
-            cur = conn.execute(
-                "SELECT * FROM results WHERE task_id = ?", (task_id,)
-            )
+            cur = conn.execute("SELECT * FROM results WHERE task_id = ?", (task_id,))
             row = cur.fetchone()
             return dict(row) if row else None
+
+    # --- Replay support (NEW) ---
+
+    def load_task_spec(self, task_id: str) -> Optional[TaskSpec]:
+        """
+        Reconstruct a TaskSpec from persisted DB values (JSON fields decoded).
+        Returns None if task does not exist.
+        """
+        row = self.get_task(task_id)
+        if not row:
+            return None
+
+        constraints_raw = row.get("constraints", "{}")
+        inputs_raw = row.get("inputs", "{}")
+
+        try:
+            constraints = json.loads(constraints_raw) if constraints_raw else {}
+        except json.JSONDecodeError:
+            constraints = {}
+
+        try:
+            inputs = json.loads(inputs_raw) if inputs_raw else {}
+        except json.JSONDecodeError:
+            inputs = {}
+
+        return TaskSpec(
+            id=row["id"],
+            goal=row["goal"],
+            scope=row["scope"],
+            constraints=constraints,
+            inputs=inputs,
+        )
