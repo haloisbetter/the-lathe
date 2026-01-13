@@ -1,25 +1,28 @@
 import sys
 from pathlib import Path
 
-# Ensure repo root is on Python path (CI / WSL / Docker safe)
 sys.path.append(str(Path(__file__).resolve().parents[1]))
 
 from lathe.core.task import TaskSpec
 from lathe.core.orchestrator import Orchestrator
 from lathe.bootstrap.openhands import OpenHandsExecutor
+from lathe.storage.db import LatheDB
 
 
-def test_orchestrator_runs_task():
+def test_orchestrator_logs_to_db(tmp_path):
+    db_path = tmp_path / "lathe.db"
+
+    executor = OpenHandsExecutor()
+    db = LatheDB(db_path)
+    orchestrator = Orchestrator(executor, db)
+
     task = TaskSpec(
-        id="orch-001",
-        goal="Orchestrator test",
+        id="orch-db-001",
+        goal="Test DB logging",
         scope="test",
         constraints={},
         inputs={},
     )
-
-    executor = OpenHandsExecutor()
-    orchestrator = Orchestrator(executor)
 
     result = orchestrator.run_task(task)
 
