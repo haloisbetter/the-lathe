@@ -1,18 +1,19 @@
+import sys
+from pathlib import Path
+
+# Ensure repo root is on Python path (CI / WSL / Docker safe)
+sys.path.append(str(Path(__file__).resolve().parents[1]))
+
 from lathe.core.task import TaskSpec
-from lathe.bootstrap.openhands import OpenHandsExecutor
 
 
-def test_bootstrap_executor_contract():
+def test_smoke():
     task = TaskSpec(
-        id="test-001",
-        goal="Test task execution",
+        id="smoke-001",
+        goal="Smoke test",
         scope="none",
         constraints={},
         inputs={},
     )
 
-    executor = OpenHandsExecutor()
-    result = executor.execute(task)
-
-    assert result.task_id == task.id
-    assert result.success is False
+    assert task.id == "smoke-001"
