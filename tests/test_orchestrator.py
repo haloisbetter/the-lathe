@@ -9,7 +9,7 @@ from lathe.bootstrap.openhands import OpenHandsExecutor
 from lathe.storage.db import LatheDB
 
 
-def test_orchestrator_logs_to_db(tmp_path):
+def test_orchestrator_runs_task(tmp_path):
     db_path = tmp_path / "lathe.db"
 
     executor = OpenHandsExecutor()
@@ -17,8 +17,8 @@ def test_orchestrator_logs_to_db(tmp_path):
     orchestrator = Orchestrator(executor, db)
 
     task = TaskSpec(
-        id="orch-db-001",
-        goal="Test DB logging",
+        id="orch-001",
+        goal="Orchestrator test",
         scope="test",
         constraints={},
         inputs={},
