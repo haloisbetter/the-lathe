@@ -26,7 +26,7 @@ class LatheDB:
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self.db_path)
 
-    # --- Write paths ---
+    # ---------- TASKS ----------
 
     def log_task(self, task: TaskSpec) -> None:
         with self._connect() as conn:
@@ -46,27 +46,6 @@ class LatheDB:
                 ),
             )
 
-    def log_result(self, result: TaskResult) -> None:
-        with self._connect() as conn:
-            conn.execute(
-                """
-                INSERT OR REPLACE INTO results
-                (task_id, success, summary, files_changed, commands_run, artifacts, completed_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    result.task_id,
-                    int(result.success),
-                    result.summary,
-                    json.dumps(result.files_changed),
-                    json.dumps(result.commands_run),
-                    json.dumps(result.artifacts),
-                    datetime.utcnow().isoformat(),
-                ),
-            )
-
-    # --- Read paths ---
-
     def list_tasks(self) -> List[Dict]:
         with self._connect() as conn:
             conn.row_factory = sqlite3.Row
@@ -82,41 +61,60 @@ class LatheDB:
             row = cur.fetchone()
             return dict(row) if row else None
 
-    def get_result(self, task_id: str) -> Optional[Dict]:
-        with self._connect() as conn:
-            conn.row_factory = sqlite3.Row
-            cur = conn.execute("SELECT * FROM results WHERE task_id = ?", (task_id,))
-            row = cur.fetchone()
-            return dict(row) if row else None
-
-    # --- Replay support (NEW) ---
-
     def load_task_spec(self, task_id: str) -> Optional[TaskSpec]:
-        """
-        Reconstruct a TaskSpec from persisted DB values (JSON fields decoded).
-        Returns None if task does not exist.
-        """
         row = self.get_task(task_id)
         if not row:
             return None
-
-        constraints_raw = row.get("constraints", "{}")
-        inputs_raw = row.get("inputs", "{}")
-
-        try:
-            constraints = json.loads(constraints_raw) if constraints_raw else {}
-        except json.JSONDecodeError:
-            constraints = {}
-
-        try:
-            inputs = json.loads(inputs_raw) if inputs_raw else {}
-        except json.JSONDecodeError:
-            inputs = {}
 
         return TaskSpec(
             id=row["id"],
             goal=row["goal"],
             scope=row["scope"],
-            constraints=constraints,
-            inputs=inputs,
+            constraints=json.loads(row["constraints"]),
+            inputs=json.loads(row["inputs"]),
         )
+
+    # ---------- RUNS ----------
+
+    def log_run(self, result: TaskResult) -> int:
+        with self._connect() as conn:
+            cur = conn.execute(
+                """
+                INSERT INTO runs
+                (task_id, success, summary, files_changed, commands_run, artifacts, completed_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    result.task_id,
+                    int(result.success),
+                    result.summary,
+                    json.dumps(result.files_changed),
+                    json.dumps(result.commands_run),
+                    json.dumps(result.artifacts),
+                    datetime.utcnow().isoformat(),
+                ),
+            )
+            return cur.lastrowid
+
+    def list_runs(self, task_id: str) -> List[Dict]:
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.execute(
+                """
+                SELECT run_id, success, completed_at
+                FROM runs
+                WHERE task_id = ?
+                ORDER BY run_id DESC
+                """,
+                (task_id,),
+            )
+            return [dict(row) for row in cur.fetchall()]
+
+    def get_run(self, run_id: int) -> Optional[Dict]:
+        with self._connect() as conn:
+            conn.row_factory = sqlite3.Row
+            cur = conn.execute(
+                "SELECT * FROM runs WHERE run_id = ?", (run_id,)
+            )
+            row = cur.fetchone()
+            return dict(row) if row else None
