@@ -7,8 +7,9 @@ CREATE TABLE IF NOT EXISTS tasks (
     created_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS results (
-    task_id TEXT PRIMARY KEY,
+CREATE TABLE IF NOT EXISTS runs (
+    run_id INTEGER PRIMARY KEY AUTOINCREMENT,
+    task_id TEXT NOT NULL,
     success INTEGER NOT NULL,
     summary TEXT NOT NULL,
     files_changed TEXT NOT NULL,
