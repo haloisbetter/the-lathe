@@ -1,8 +1,27 @@
+[build-system]
+requires = ["setuptools>=45", "wheel"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "the-lathe"
-version = "0.1.0"
-description = "Self-hosting agentic orchestrator"
+version = "1.0.0"
+description = "Phase-locked AI development control layer with validation and orchestration"
+authors = [{name = "Lathe Project"}]
+license = {text = "ISC"}
 requires-python = ">=3.11"
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+]
+
+[tool.setuptools]
+packages = ["lathe"]
+
+[tool.setuptools.package-data]
+lathe = ["validation/schema.sql"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
