@@ -1,0 +1,21 @@
+{
+  "name": "lathe",
+  "version": "1.0.0",
+  "description": "The Lathe - AI coding control layer",
+  "main": "index.js",
+  "scripts": {
+    "test": "python -m pytest tests/",
+    "build": "echo 'Python project - no build step required'",
+    "start": "echo 'This is a Python library project'"
+  },
+  "keywords": [
+    "ai",
+    "control",
+    "python",
+    "openweb-ui"
+  ],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {},
+  "devDependencies": {}
+}
