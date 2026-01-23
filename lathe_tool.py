@@ -1,13 +1,20 @@
 """
 OpenWebUI Tool: Lathe AI Control Layer
 
-This is a standalone OpenWebUI-compatible tool file.
-It provides three functions for phase-locked AI development:
+Canonical entrypoint for OpenWebUI tool publication.
+
+This file:
+- Is the ONLY tool entrypoint (not a package)
+- Provides three functions for phase-locked AI development
+- Returns JSON-serializable results
+- Contains no business logic (only orchestration)
+
+Functions:
 - lathe_plan: Prepare a phase-locked AI step
 - lathe_validate: Validate AI output against rules
 - lathe_context_preview: Preview context assembly
 
-All functions are stateless and return JSON-serializable dicts.
+All functions are stateless and deterministic.
 """
 
 from typing import Any, Dict, List, Optional
@@ -36,6 +43,11 @@ from lathe.validation.rules import (
     RequireRollbackStepsRule,
     RequireChecklistFormatRule,
 )
+
+__version__ = "1.0.0"
+__title__ = "Lathe"
+__description__ = "AI coding control layer with phase-locked development"
+__author__ = "Lathe Project"
 
 
 def _error_response(
@@ -637,10 +649,3 @@ def lathe_context_preview(
             f"Error in lathe_context_preview: {str(e)}",
             {"exception": type(e).__name__},
         )
-
-
-# OpenWebUI tool metadata
-__title__ = "Lathe"
-__description__ = "AI coding control layer with phase-locked development"
-__version__ = "1.0.0"
-__author__ = "Lathe Project"
