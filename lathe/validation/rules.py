@@ -229,3 +229,137 @@ class OutputFormatRule(ValidationRule):
         """
         # Placeholder: Format validation depends on format_type
         return bool(content.strip())
+
+
+class NoCodeOutputRule(ValidationRule):
+    """
+    Rule: Output must not contain code blocks or code snippets.
+
+    Enforces ANALYSIS phase discipline - no code, no implementations, no commands.
+    Designed for analysis phase where only prose, findings, and risks are allowed.
+    """
+
+    def __init__(
+        self,
+        severity: ValidationLevel = ValidationLevel.FAIL,
+        allow_technical_terms: bool = True,
+    ):
+        super().__init__(
+            rule_id="no_code_output",
+            name="No Code Output",
+            severity=severity,
+            description="Output must not contain code blocks, snippets, file paths, or commands",
+            metadata={"allow_technical_terms": allow_technical_terms},
+        )
+        self.allow_technical_terms = allow_technical_terms
+
+        # Code block patterns
+        self.code_block_markers = [
+            "```",  # Fenced code blocks
+            "~~~",  # Alternative fenced blocks
+        ]
+
+        # Programming keywords (common across languages)
+        self.code_keywords = [
+            "def ",
+            "class ",
+            "import ",
+            "from ",
+            "function ",
+            "const ",
+            "let ",
+            "var ",
+            "public ",
+            "private ",
+            "protected ",
+            "void ",
+            "int ",
+            "string ",
+            "boolean ",
+            "async ",
+            "await ",
+            "return ",
+            "if (",
+            "for (",
+            "while (",
+            "switch (",
+        ]
+
+        # Shell command patterns
+        self.command_patterns = [
+            "\n$ ",
+            "\n# ",
+            "\n> ",
+            "bash\n",
+            "sh\n",
+            "python\n",
+            "node\n",
+            "npm ",
+            "pip install",
+            "apt-get",
+            "docker run",
+            "git clone",
+        ]
+
+        # File path patterns (more strict)
+        self.file_path_indicators = [
+            "/src/",
+            "/lib/",
+            "/bin/",
+            "/usr/",
+            "/etc/",
+            "/home/",
+            "/app/",
+            ".py:",
+            ".js:",
+            ".ts:",
+            ".java:",
+            ".cpp:",
+            ".go:",
+            ".rs:",
+            "file://",
+        ]
+
+    def evaluate(self, content: str) -> bool:
+        """
+        Check if content contains code blocks, snippets, or commands.
+
+        Args:
+            content: Content to check
+
+        Returns:
+            True if NO code detected (passes), False if code found (fails)
+        """
+        # Check for fenced code blocks
+        for marker in self.code_block_markers:
+            if marker in content:
+                return False
+
+        # Check for inline code with context (avoid false positives)
+        # Only flag if there are multiple backticks or code-like content
+        if content.count("`") >= 4:  # At least 2 inline code snippets
+            return False
+
+        # Check for programming keywords
+        content_lower = content.lower()
+        for keyword in self.code_keywords:
+            if keyword in content_lower:
+                # Additional check: ensure it's not just technical discussion
+                if self.allow_technical_terms:
+                    # Allow keywords in quotes or as references
+                    if f'"{keyword.strip()}"' in content_lower or f"'{keyword.strip()}'" in content_lower:
+                        continue
+                return False
+
+        # Check for shell commands
+        for pattern in self.command_patterns:
+            if pattern in content:
+                return False
+
+        # Check for file paths
+        for indicator in self.file_path_indicators:
+            if indicator in content:
+                return False
+
+        # If no code indicators found, passes
+        return True

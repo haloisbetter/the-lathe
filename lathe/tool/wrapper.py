@@ -23,6 +23,7 @@ from lathe.validation.rules import (
     RequiredSectionRule,
     NoHallucinatedFilesRule,
     OutputFormatRule,
+    NoCodeOutputRule,
 )
 
 
@@ -112,6 +113,33 @@ def lathe_plan(
 
         # Create a system prompt if not registered
         # (In production, these would be pre-loaded from configuration)
+
+        # Phase-specific enforcement messages
+        phase_enforcement = {
+            "analysis": """
+CRITICAL ANALYSIS PHASE RULES:
+- NO CODE OUTPUT - You must not write any code blocks, snippets, or implementations
+- NO DESIGN ARTIFACTS - Do not create architecture diagrams or design documents
+- NO FILE PATHS - Do not reference specific file locations
+- NO COMMANDS - Do not provide shell commands or executable instructions
+
+ALLOWED IN ANALYSIS:
+- Findings and observations
+- Risk identification
+- Problem statement
+- Requirements discovery
+- Assumptions and unknowns
+- Questions that need answers
+
+OUTPUT MUST BE PROSE ONLY.""",
+            "design": "",
+            "implementation": "",
+            "validation": "",
+            "hardening": "",
+        }
+
+        enforcement_text = phase_enforcement.get(phase, "")
+
         system_prompt_content = f"""You are operating in {phase.upper()} phase.
 
 Project: {project}
@@ -120,6 +148,7 @@ Goal: {goal}
 
 Constraints:
 {chr(10).join(f"- {c}" for c in (constraints or ["None"]))}
+{enforcement_text}
 
 Apply phase-specific discipline and rules.
 Do not exceed phase boundaries.
@@ -302,11 +331,12 @@ def lathe_validate(
             "required_section": RequiredSectionRule,
             "no_hallucinated_files": NoHallucinatedFilesRule,
             "output_format": OutputFormatRule,
+            "no_code_output": NoCodeOutputRule,
         }
 
         # Default rules per phase
         default_rules_per_phase = {
-            "analysis": ["explicit_assumptions", "required_section"],
+            "analysis": ["no_code_output", "explicit_assumptions", "required_section"],
             "design": ["required_section", "output_format"],
             "implementation": ["full_file_replacement", "output_format"],
             "validation": ["no_hallucinated_files", "output_format"],
@@ -322,11 +352,14 @@ def lathe_validate(
             rule_class = rule_name_to_class.get(rule_name)
             if rule_class:
                 # Instantiate with appropriate severity for phase
-                severity = (
-                    ValidationLevel.FAIL
-                    if phase in ["validation", "implementation"]
-                    else ValidationLevel.WARN
-                )
+                # no_code_output is always FAIL (critical for analysis phase)
+                if rule_name == "no_code_output":
+                    severity = ValidationLevel.FAIL
+                elif phase in ["validation", "implementation"]:
+                    severity = ValidationLevel.FAIL
+                else:
+                    severity = ValidationLevel.WARN
+
                 try:
                     # Special handling for rules with required arguments
                     if rule_name == "required_section":
