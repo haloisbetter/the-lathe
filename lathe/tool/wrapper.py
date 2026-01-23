@@ -27,6 +27,9 @@ from lathe.validation.rules import (
     RequireMultipleDesignOptionsRule,
     RequireTradeoffsRule,
     AllowDiagramsRule,
+    RequireExplicitFilenameRule,
+    RequireFullFileReplacementRule,
+    ForbidMultipleImplementationsRule,
 )
 
 
@@ -162,7 +165,41 @@ REQUIRED STRUCTURE:
 2. Tradeoff Analysis for each option
 3. Architecture Description or Diagram
 4. Recommended Approach with justification""",
-            "implementation": "",
+            "implementation": """
+IMPLEMENTATION PHASE REQUIREMENTS:
+- MUST have explicit filename(s) - Declare which file(s) are being modified
+- MUST provide FULL file replacement - Complete file content, no snippets
+- MUST be single implementation - No alternatives or "pick one" scenarios
+- NO partial snippets - Avoid "... rest of file", "assume this exists", etc.
+- ALL assumptions MUST be explicit - State any prerequisites clearly
+
+ALLOWED IN IMPLEMENTATION:
+- Complete file content with imports and full structure
+- Code with proper error handling
+- Database migrations with full SQL
+- Configuration files (complete)
+- Comments explaining non-obvious logic
+- File paths with clear directory structure
+
+FORBIDDEN IN IMPLEMENTATION:
+- Inline code snippets ("just add this to line 42")
+- "Assume this file exists" patterns
+- Multiple alternative implementations
+- Partial content ("... rest of")
+- Vague references to existing code
+- Unspecified behavior
+
+REQUIRED STRUCTURE:
+1. Filename/File Path (explicit)
+2. Assumptions Section (if any prerequisites)
+3. Complete File Content (entire file replacement)
+4. Usage Instructions (how to deploy/test)
+
+SAFETY CONSTRAINTS:
+- No shell execution
+- No auto-fix attempts
+- No persistent state changes
+- Output only - no validation""",
             "validation": "",
             "hardening": "",
         }
@@ -364,13 +401,16 @@ def lathe_validate(
             "require_multiple_design_options": RequireMultipleDesignOptionsRule,
             "require_tradeoffs": RequireTradeoffsRule,
             "allow_diagrams": AllowDiagramsRule,
+            "require_explicit_filename": RequireExplicitFilenameRule,
+            "require_full_file_replacement": RequireFullFileReplacementRule,
+            "forbid_multiple_implementations": ForbidMultipleImplementationsRule,
         }
 
         # Default rules per phase
         default_rules_per_phase = {
             "analysis": ["no_code_output", "explicit_assumptions", "required_section"],
             "design": ["no_code_output", "require_multiple_design_options", "require_tradeoffs", "allow_diagrams"],
-            "implementation": ["full_file_replacement", "output_format"],
+            "implementation": ["require_explicit_filename", "require_full_file_replacement", "forbid_multiple_implementations", "explicit_assumptions"],
             "validation": ["no_hallucinated_files", "output_format"],
             "hardening": ["output_format"],
         }

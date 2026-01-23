@@ -552,3 +552,250 @@ class AllowDiagramsRule(ValidationRule):
         # At least one diagram indicator is good
         # This is permissive - just checking that architecture is described
         return diagram_count >= 1
+
+
+class RequireExplicitFilenameRule(ValidationRule):
+    """
+    Rule: Implementation must explicitly state filename(s).
+
+    Prevents ambiguous implementations - must declare which files are being modified.
+    """
+
+    def __init__(
+        self,
+        severity: ValidationLevel = ValidationLevel.FAIL,
+    ):
+        super().__init__(
+            rule_id="require_explicit_filename",
+            name="Explicit Filename",
+            severity=severity,
+            description="Implementation must explicitly state filename(s) being modified",
+            metadata={},
+        )
+
+        # Filename indicators
+        self.filename_markers = [
+            "filename:",
+            "file:",
+            "path:",
+            "src/",
+            "lib/",
+            "components/",
+            "utils/",
+            "services/",
+            "pages/",
+            "api/",
+            "database/",
+            ".ts",
+            ".tsx",
+            ".js",
+            ".jsx",
+            ".py",
+            ".sql",
+            ".json",
+            ".yml",
+            ".yaml",
+            ".env",
+            ".md",
+            "create file",
+            "create new file",
+            "new file",
+            "this file",
+            "this is the file",
+        ]
+
+    def evaluate(self, content: str) -> bool:
+        """
+        Check if implementation explicitly states filename(s).
+
+        Args:
+            content: Implementation content to check
+
+        Returns:
+            True if filenames found
+        """
+        content_lower = content.lower()
+
+        # Count filename markers
+        filename_count = 0
+        for marker in self.filename_markers:
+            if marker in content_lower:
+                filename_count += 1
+
+        # Need at least one clear filename indicator
+        return filename_count >= 1
+
+
+class RequireFullFileReplacementRule(ValidationRule):
+    """
+    Rule: Implementation must provide full file content.
+
+    Prevents partial snippets or "assume this exists" patterns.
+    Enforces complete, determinstic output.
+    """
+
+    def __init__(
+        self,
+        severity: ValidationLevel = ValidationLevel.FAIL,
+    ):
+        super().__init__(
+            rule_id="require_full_file_replacement",
+            name="Full File Replacement",
+            severity=severity,
+            description="Implementation must provide complete file content, not snippets",
+            metadata={},
+        )
+
+        # Markers indicating partial/incomplete content
+        self.partial_indicators = [
+            "you can use this",
+            "you might use this",
+            "you could add",
+            "you could also add",
+            "... rest of",
+            "[rest of",
+            "// rest of",
+            "# rest of",
+            "and so on",
+            "et cetera",
+            "etc.",
+            "[omitted",
+            "[abbreviated",
+            "[truncated",
+            "unchanged",
+            "no changes needed",
+            "assume this exists",
+            "assume the file",
+            "assuming",
+            "leave as is",
+            "keep this",
+            "don't change",
+        ]
+
+        # Markers indicating completeness
+        self.complete_indicators = [
+            "full file replacement",
+            "complete file",
+            "entire file",
+            "full content",
+            "complete content",
+            "this is the complete",
+            "here is the full",
+        ]
+
+    def evaluate(self, content: str) -> bool:
+        """
+        Check if implementation provides complete file content.
+
+        Args:
+            content: Implementation content to check
+
+        Returns:
+            True if complete content found
+        """
+        content_lower = content.lower()
+
+        # Count partial indicators
+        partial_count = 0
+        for indicator in self.partial_indicators:
+            if indicator in content_lower:
+                partial_count += 1
+
+        # Count complete indicators
+        complete_count = 0
+        for indicator in self.complete_indicators:
+            if indicator in content_lower:
+                complete_count += 1
+
+        # If explicitly marked complete, pass
+        if complete_count > 0:
+            return True
+
+        # If partial indicators present, fail
+        if partial_count > 0:
+            return False
+
+        # Check if content looks complete (has opening and closing markers)
+        # Files typically have opening structure (import, function, class, etc.)
+        # and ending structure (closing braces, EOF, etc.)
+        has_opening = any(
+            marker in content_lower
+            for marker in ["import", "def ", "class ", "function", "export", "const ", "let ", "var "]
+        )
+        has_closing = any(
+            marker in content_lower
+            for marker in ["return", "}", "```", "\n\n", "end of file"]
+        )
+
+        # Without explicit markers, check structure heuristics
+        # If has opening but no partial indicators, likely complete
+        return has_opening or len(content) > 100
+
+
+class ForbidMultipleImplementationsRule(ValidationRule):
+    """
+    Rule: Implementation must NOT present multiple alternatives.
+
+    Prevents ambiguous "pick one" scenarios.
+    Forces commitment to single, clear implementation.
+    """
+
+    def __init__(
+        self,
+        severity: ValidationLevel = ValidationLevel.FAIL,
+    ):
+        super().__init__(
+            rule_id="forbid_multiple_implementations",
+            name="No Multiple Alternatives",
+            severity=severity,
+            description="Implementation must present single approach, not alternatives",
+            metadata={},
+        )
+
+        # Markers indicating multiple options/alternatives
+        self.alternative_markers = [
+            "option 1",
+            "option 2",
+            "option 3",
+            "approach 1",
+            "approach 2",
+            "alternative 1",
+            "alternative 2",
+            "variant 1",
+            "variant 2",
+            "solution a",
+            "solution b",
+            "method 1",
+            "method 2",
+            "implementation 1",
+            "implementation 2",
+            "you could do",
+            "you could also",
+            "another way",
+            "another option",
+            "one approach",
+            "another approach",
+            "or you could",
+            "alternatively",
+        ]
+
+    def evaluate(self, content: str) -> bool:
+        """
+        Check if implementation presents single approach.
+
+        Args:
+            content: Implementation content to check
+
+        Returns:
+            True if single implementation (no alternatives)
+        """
+        content_lower = content.lower()
+
+        # Count alternative markers
+        alternative_count = 0
+        for marker in self.alternative_markers:
+            if marker in content_lower:
+                alternative_count += 1
+
+        # Should have NO alternative markers in implementation
+        return alternative_count == 0
