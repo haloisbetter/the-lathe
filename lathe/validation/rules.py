@@ -799,3 +799,267 @@ class ForbidMultipleImplementationsRule(ValidationRule):
 
         # Should have NO alternative markers in implementation
         return alternative_count == 0
+
+
+class ForbidNewCodeRule(ValidationRule):
+    """
+    Rule: Validation output must NOT contain new code blocks.
+
+    Prevents new implementation during validation phase.
+    Enforces testing-only behavior.
+    """
+
+    def __init__(
+        self,
+        severity: ValidationLevel = ValidationLevel.FAIL,
+    ):
+        super().__init__(
+            rule_id="forbid_new_code",
+            name="No New Code",
+            severity=severity,
+            description="Validation output must not contain new code blocks",
+            metadata={},
+        )
+
+        # Code block markers
+        self.code_markers = [
+            "```",
+            "```typescript",
+            "```javascript",
+            "```python",
+            "```sql",
+            "```bash",
+            "```json",
+            "```yaml",
+            "```yml",
+            "```jsx",
+            "```tsx",
+            "function ",
+            "class ",
+            "const ",
+            "let ",
+            "var ",
+            "def ",
+            "export ",
+            "import ",
+            "SELECT ",
+            "INSERT ",
+            "UPDATE ",
+            "DELETE ",
+            "CREATE TABLE",
+            "ALTER TABLE",
+            "DROP TABLE",
+        ]
+
+    def evaluate(self, content: str) -> bool:
+        """
+        Check if validation output contains new code blocks.
+
+        Args:
+            content: Validation output to check
+
+        Returns:
+            True if no code blocks found
+        """
+        content_lower = content.lower()
+
+        # Count code markers
+        code_count = 0
+        for marker in self.code_markers:
+            if marker.lower() in content_lower:
+                code_count += 1
+
+        # Should have NO code markers in validation output
+        return code_count == 0
+
+
+class ForbidNewImplementationRule(ValidationRule):
+    """
+    Rule: Validation output must NOT propose new implementation.
+
+    Prevents refactors, feature additions, or new code during validation.
+    Enforces verification-only thinking.
+    """
+
+    def __init__(
+        self,
+        severity: ValidationLevel = ValidationLevel.FAIL,
+    ):
+        super().__init__(
+            rule_id="forbid_new_implementation",
+            name="No New Implementation",
+            severity=severity,
+            description="Validation output must not propose new implementation",
+            metadata={},
+        )
+
+        # Implementation proposal markers
+        self.implementation_markers = [
+            "add this",
+            "add the following",
+            "create a new",
+            "create this",
+            "implement",
+            "we should add",
+            "we could add",
+            "we need to add",
+            "refactor",
+            "refactoring",
+            "improve",
+            "enhancement",
+            "feature",
+            "optimization",
+            "add error handling",
+            "add validation",
+            "add logging",
+            "add metrics",
+            "should be added",
+            "needs to be added",
+            "could be improved",
+            "let's add",
+            "let's create",
+            "you should add",
+            "you should create",
+        ]
+
+    def evaluate(self, content: str) -> bool:
+        """
+        Check if validation output proposes new implementation.
+
+        Args:
+            content: Validation output to check
+
+        Returns:
+            True if no new implementation proposed
+        """
+        content_lower = content.lower()
+
+        # Count implementation markers
+        impl_count = 0
+        for marker in self.implementation_markers:
+            if marker in content_lower:
+                impl_count += 1
+
+        # Should have NO implementation proposal markers in validation
+        return impl_count == 0
+
+
+class RequireRollbackStepsRule(ValidationRule):
+    """
+    Rule: Validation output should document rollback steps.
+
+    Ensures safe deployment with documented recovery procedures.
+    """
+
+    def __init__(
+        self,
+        severity: ValidationLevel = ValidationLevel.WARN,
+    ):
+        super().__init__(
+            rule_id="require_rollback_steps",
+            name="Rollback Steps",
+            severity=severity,
+            description="Validation output should include rollback procedures",
+            metadata={},
+        )
+
+        # Rollback indicators
+        self.rollback_markers = [
+            "rollback",
+            "revert",
+            "undo",
+            "restore",
+            "recovery",
+            "fallback",
+            "recovery procedure",
+            "if deployment fails",
+            "in case of failure",
+            "emergency",
+            "downtime procedure",
+        ]
+
+    def evaluate(self, content: str) -> bool:
+        """
+        Check if validation output includes rollback steps.
+
+        Args:
+            content: Validation output to check
+
+        Returns:
+            True if rollback steps found
+        """
+        content_lower = content.lower()
+
+        # Count rollback markers
+        rollback_count = 0
+        for marker in self.rollback_markers:
+            if marker in content_lower:
+                rollback_count += 1
+
+        # Should have at least one rollback marker
+        return rollback_count >= 1
+
+
+class RequireChecklistFormatRule(ValidationRule):
+    """
+    Rule: Validation output must use checklist format.
+
+    Enforces structured, verifiable output format.
+    """
+
+    def __init__(
+        self,
+        severity: ValidationLevel = ValidationLevel.WARN,
+    ):
+        super().__init__(
+            rule_id="require_checklist_format",
+            name="Checklist Format",
+            severity=severity,
+            description="Validation output should use checklist format with success criteria",
+            metadata={},
+        )
+
+        # Checklist indicators
+        self.checklist_markers = [
+            "- [ ]",
+            "-[x]",
+            "- [x]",
+            "- [ ]",
+            "✓",
+            "✗",
+            "checkbox",
+            "checklist",
+            "verification checklist",
+            "test checklist",
+            "success criteria:",
+            "acceptance criteria:",
+            "test cases:",
+            "test steps:",
+            "verify that",
+            "ensure that",
+            "confirm that",
+            "expected result:",
+            "actual result:",
+            "pass/fail",
+        ]
+
+    def evaluate(self, content: str) -> bool:
+        """
+        Check if validation output uses checklist format.
+
+        Args:
+            content: Validation output to check
+
+        Returns:
+            True if checklist format found
+        """
+        content_lower = content.lower()
+
+        # Count checklist markers
+        checklist_count = 0
+        for marker in self.checklist_markers:
+            if marker.lower() in content_lower:
+                checklist_count += 1
+
+        # Should have at least checklist structure
+        return checklist_count >= 2

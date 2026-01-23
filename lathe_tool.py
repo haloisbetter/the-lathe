@@ -31,6 +31,10 @@ from lathe.validation.rules import (
     RequireExplicitFilenameRule,
     RequireFullFileReplacementRule,
     ForbidMultipleImplementationsRule,
+    ForbidNewCodeRule,
+    ForbidNewImplementationRule,
+    RequireRollbackStepsRule,
+    RequireChecklistFormatRule,
 )
 
 
@@ -201,7 +205,47 @@ SAFETY CONSTRAINTS:
 - No auto-fix attempts
 - No persistent state changes
 - Output only - no validation""",
-            "validation": "",
+            "validation": """
+VALIDATION PHASE REQUIREMENTS:
+- NO NEW CODE - Absolutely no code blocks or code snippets
+- NO NEW IMPLEMENTATION - No refactors, features, or enhancements proposed
+- MUST include rollback steps - Document recovery procedures
+- MUST use checklist format - Structured, verifiable testing format
+- FOCUS ON VERIFICATION - Only test what was implemented, don't build new
+
+ALLOWED IN VALIDATION:
+- Verification checklists with test steps
+- Test plans and test cases
+- Expected vs actual results
+- Logs to inspect and error messages
+- Rollback procedures and recovery steps
+- Success criteria and acceptance tests
+- Performance baselines and metrics
+
+FORBIDDEN IN VALIDATION:
+- Any code blocks or code fragments
+- Suggestions for refactoring or improvement
+- Feature enhancement proposals
+- "We should add" or "we need to add" language
+- New implementation ideas
+- Optimization suggestions
+
+REQUIRED STRUCTURE:
+1. Test Plan (what will be tested)
+2. Verification Checklist (step-by-step tests)
+   - [ ] Test Case 1
+   - [ ] Test Case 2
+   - Expected Result: ...
+   - Actual Result: ...
+3. Success Criteria (define pass/fail)
+4. Rollback Procedure (if tests fail)
+5. Logs to Inspect (monitoring and debugging)
+
+SAFETY CONSTRAINTS:
+- No code execution
+- No state changes
+- No auto-fixes
+- Verification only - no implementation""",
             "hardening": "",
         }
 
@@ -405,6 +449,10 @@ def lathe_validate(
             "require_explicit_filename": RequireExplicitFilenameRule,
             "require_full_file_replacement": RequireFullFileReplacementRule,
             "forbid_multiple_implementations": ForbidMultipleImplementationsRule,
+            "forbid_new_code": ForbidNewCodeRule,
+            "forbid_new_implementation": ForbidNewImplementationRule,
+            "require_rollback_steps": RequireRollbackStepsRule,
+            "require_checklist_format": RequireChecklistFormatRule,
         }
 
         # Default rules per phase
@@ -412,7 +460,7 @@ def lathe_validate(
             "analysis": ["no_code_output", "explicit_assumptions", "required_section"],
             "design": ["no_code_output", "require_multiple_design_options", "require_tradeoffs", "allow_diagrams"],
             "implementation": ["require_explicit_filename", "require_full_file_replacement", "forbid_multiple_implementations", "explicit_assumptions"],
-            "validation": ["no_hallucinated_files", "output_format"],
+            "validation": ["forbid_new_code", "forbid_new_implementation", "require_rollback_steps", "require_checklist_format"],
             "hardening": ["output_format"],
         }
 
