@@ -1,0 +1,212 @@
+{
+  "name": "lathe",
+  "version": "1.0.0",
+  "description": "AI coding control layer with phase-locked development workflow",
+  "author": "Lathe Project",
+  "type": "python",
+  "module": "lathe_tool",
+  "path": "/tmp/cc-agent/62910883/project/lathe_tool.py",
+  "functions": [
+    {
+      "name": "lathe_plan",
+      "description": "Prepare a phase-locked AI development step with system prompt and context assembly",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "project": {
+            "type": "string",
+            "description": "Project name or identifier"
+          },
+          "scope": {
+            "type": "string",
+            "description": "Scope identifier (e.g., 'auth', 'api', 'frontend')"
+          },
+          "phase": {
+            "type": "string",
+            "description": "Development phase: 'analysis', 'design', 'implementation', 'validation', or 'hardening'",
+            "enum": ["analysis", "design", "implementation", "validation", "hardening"]
+          },
+          "goal": {
+            "type": "string",
+            "description": "Specific goal or objective for this phase"
+          },
+          "constraints": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional list of constraints or requirements",
+            "default": null
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional list of context sources: 'knowledge', 'memory', 'files'",
+            "default": null
+          }
+        },
+        "required": ["project", "scope", "phase", "goal"]
+      },
+      "returns": {
+        "type": "object",
+        "description": "Plan with system prompt, context blocks, and metadata",
+        "properties": {
+          "phase": {
+            "type": "string",
+            "description": "Current development phase"
+          },
+          "system_prompt": {
+            "type": "string",
+            "description": "Generated system prompt for the AI"
+          },
+          "context_blocks": {
+            "type": "array",
+            "description": "Assembled context blocks with sources"
+          },
+          "total_tokens": {
+            "type": "integer",
+            "description": "Estimated total token count"
+          },
+          "constraints": {
+            "type": "array",
+            "description": "Applied constraints"
+          }
+        }
+      }
+    },
+    {
+      "name": "lathe_validate",
+      "description": "Validate AI output against phase-specific rules and constraints",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "phase": {
+            "type": "string",
+            "description": "Development phase to validate against: 'analysis', 'design', 'implementation', 'validation', or 'hardening'",
+            "enum": ["analysis", "design", "implementation", "validation", "hardening"]
+          },
+          "output": {
+            "type": "string",
+            "description": "AI output text to validate"
+          },
+          "ruleset": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional custom ruleset (default: phase-specific rules)",
+            "default": null
+          }
+        },
+        "required": ["phase", "output"]
+      },
+      "returns": {
+        "type": "object",
+        "description": "Validation result with status and violations",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Validation status: 'pass', 'warn', or 'fail'",
+            "enum": ["pass", "warn", "fail"]
+          },
+          "violations": {
+            "type": "array",
+            "description": "List of rule violations (errors and warnings)"
+          },
+          "summary": {
+            "type": "string",
+            "description": "Human-readable validation summary"
+          },
+          "can_proceed": {
+            "type": "boolean",
+            "description": "Whether the workflow can proceed to next phase"
+          }
+        }
+      }
+    },
+    {
+      "name": "lathe_context_preview",
+      "description": "Preview context assembly without full planning (useful for debugging and token estimation)",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "description": "Query or identifier for context gathering"
+          },
+          "sources": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Optional list of context sources: 'knowledge', 'memory', 'files'",
+            "default": null
+          },
+          "max_tokens": {
+            "type": "integer",
+            "description": "Maximum tokens to include in preview",
+            "default": 2000
+          }
+        },
+        "required": ["query"]
+      },
+      "returns": {
+        "type": "object",
+        "description": "Context preview with token estimates",
+        "properties": {
+          "context_blocks": {
+            "type": "array",
+            "description": "Preview of context blocks"
+          },
+          "total_tokens": {
+            "type": "integer",
+            "description": "Total estimated tokens"
+          },
+          "truncated": {
+            "type": "boolean",
+            "description": "Whether context was truncated to fit max_tokens"
+          }
+        }
+      }
+    }
+  ],
+  "usage": {
+    "examples": [
+      {
+        "description": "Start analysis phase for authentication system",
+        "function": "lathe_plan",
+        "parameters": {
+          "project": "myapp",
+          "scope": "auth",
+          "phase": "analysis",
+          "goal": "Identify authentication requirements and security considerations"
+        }
+      },
+      {
+        "description": "Validate design phase output",
+        "function": "lathe_validate",
+        "parameters": {
+          "phase": "design",
+          "output": "# Architecture\n\n## Components\n- Auth Service\n- Token Manager\n\n## Trade-offs\n- JWT vs Sessions: JWT chosen for stateless scaling"
+        }
+      },
+      {
+        "description": "Preview context for a query",
+        "function": "lathe_context_preview",
+        "parameters": {
+          "query": "authentication best practices",
+          "sources": ["knowledge", "files"]
+        }
+      }
+    ]
+  },
+  "metadata": {
+    "tags": ["ai", "control", "workflow", "validation", "phase-locked"],
+    "category": "development",
+    "license": "ISC",
+    "repository": "https://github.com/your-org/lathe",
+    "documentation": "https://github.com/your-org/lathe#readme"
+  }
+}
