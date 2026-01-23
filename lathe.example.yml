@@ -1,0 +1,18 @@
+# The Lathe Configuration Example
+#
+# Copy this file to lathe.yml and customize as needed.
+# Environment variable: LATHE_CONFIG can override the config file path.
+
+database:
+  path: "data/lathe.db"
+  schema_path: "lathe/storage/schema.sql"
+
+logging:
+  level: "INFO"  # DEBUG, INFO, WARNING, ERROR, CRITICAL
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  file: null  # Optional: "logs/lathe.log"
+
+executor:
+  type: "openhands"  # Bootstrap executor type
+  timeout: 300  # Maximum execution time in seconds
+  options: {}  # Executor-specific options

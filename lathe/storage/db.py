@@ -9,18 +9,20 @@ from lathe.core.result import TaskResult
 
 
 DB_PATH = Path("data/lathe.db")
+SCHEMA_PATH = Path("lathe/storage/schema.sql")
 
 
 class LatheDB:
-    def __init__(self, db_path: Path = DB_PATH):
+    def __init__(self, db_path: Path = DB_PATH, schema_path: Path = SCHEMA_PATH):
         self.db_path = db_path
+        self.schema_path = schema_path
         self._ensure_db()
 
     def _ensure_db(self) -> None:
         self.db_path.parent.mkdir(parents=True, exist_ok=True)
         with self._connect() as conn:
             conn.row_factory = sqlite3.Row
-            with open("lathe/storage/schema.sql", "r", encoding="utf-8") as f:
+            with open(self.schema_path, "r", encoding="utf-8") as f:
                 conn.executescript(f.read())
 
     def _connect(self) -> sqlite3.Connection:
