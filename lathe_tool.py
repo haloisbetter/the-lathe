@@ -25,6 +25,9 @@ from lathe.validation.rules import (
     NoHallucinatedFilesRule,
     OutputFormatRule,
     NoCodeOutputRule,
+    RequireMultipleDesignOptionsRule,
+    RequireTradeoffsRule,
+    AllowDiagramsRule,
 )
 
 
@@ -133,7 +136,33 @@ ALLOWED IN ANALYSIS:
 - Questions that need answers
 
 OUTPUT MUST BE PROSE ONLY.""",
-            "design": "",
+            "design": """
+DESIGN PHASE REQUIREMENTS:
+- NO CODE OUTPUT - You must not write executable code or implementations
+- MUST present multiple design options - Consider at least 2 different approaches
+- MUST discuss tradeoffs - Explain pros, cons, and implications of each option
+- CAN use diagrams - ASCII art and Mermaid diagrams are encouraged
+- MUST include architecture descriptions - How components interact
+
+ALLOWED IN DESIGN:
+- Architecture descriptions and diagrams
+- Tradeoff tables and comparisons
+- Design patterns and their justification
+- Migration or transition strategies
+- Interface specifications (without implementation)
+- Component relationships and data flow
+
+FORBIDDEN IN DESIGN:
+- Executable code or code fragments
+- SQL queries or database schemas
+- Configuration files
+- Shell commands or deployment scripts
+
+REQUIRED STRUCTURE:
+1. Design Options (at least 2)
+2. Tradeoff Analysis for each option
+3. Architecture Description or Diagram
+4. Recommended Approach with justification""",
             "implementation": "",
             "validation": "",
             "hardening": "",
@@ -333,12 +362,15 @@ def lathe_validate(
             "no_hallucinated_files": NoHallucinatedFilesRule,
             "output_format": OutputFormatRule,
             "no_code_output": NoCodeOutputRule,
+            "require_multiple_design_options": RequireMultipleDesignOptionsRule,
+            "require_tradeoffs": RequireTradeoffsRule,
+            "allow_diagrams": AllowDiagramsRule,
         }
 
         # Default rules per phase
         default_rules_per_phase = {
             "analysis": ["no_code_output", "explicit_assumptions", "required_section"],
-            "design": ["required_section", "output_format"],
+            "design": ["no_code_output", "require_multiple_design_options", "require_tradeoffs", "allow_diagrams"],
             "implementation": ["full_file_replacement", "output_format"],
             "validation": ["no_hallucinated_files", "output_format"],
             "hardening": ["output_format"],

@@ -363,3 +363,192 @@ class NoCodeOutputRule(ValidationRule):
 
         # If no code indicators found, passes
         return True
+
+
+class RequireMultipleDesignOptionsRule(ValidationRule):
+    """
+    Rule: Design phase must present multiple design options.
+
+    Enforces design thinking discipline - consider alternatives.
+    Warns if only one approach is presented.
+    """
+
+    def __init__(
+        self,
+        severity: ValidationLevel = ValidationLevel.WARN,
+        min_options: int = 2,
+    ):
+        super().__init__(
+            rule_id="require_multiple_design_options",
+            name="Multiple Design Options",
+            severity=severity,
+            description=f"Design should present at least {min_options} different approaches",
+            metadata={"min_options": min_options},
+        )
+        self.min_options = min_options
+
+        # Keywords that indicate design options
+        self.option_markers = [
+            "Option 1",
+            "Option 2",
+            "Option 3",
+            "Approach 1",
+            "Approach 2",
+            "Approach 3",
+            "Alternative 1",
+            "Alternative 2",
+            "Design A",
+            "Design B",
+            "Solution 1",
+            "Solution 2",
+            "Strategy 1",
+            "Strategy 2",
+        ]
+
+    def evaluate(self, content: str) -> bool:
+        """
+        Check if design presents multiple options.
+
+        Args:
+            content: Design content to check
+
+        Returns:
+            True if multiple options found
+        """
+        # Count how many option markers appear
+        option_count = 0
+        for marker in self.option_markers:
+            if marker in content:
+                option_count += 1
+
+        # Count explicit mentions of "options" or "alternatives"
+        if "option" in content.lower() and "another" in content.lower():
+            option_count = max(option_count, 2)
+        if "alternative" in content.lower() and ("however" in content.lower() or "versus" in content.lower()):
+            option_count = max(option_count, 2)
+
+        return option_count >= self.min_options
+
+
+class RequireTradeoffsRule(ValidationRule):
+    """
+    Rule: Design phase must discuss tradeoffs.
+
+    Enforces consideration of design implications.
+    Warns if tradeoff analysis is missing.
+    """
+
+    def __init__(
+        self,
+        severity: ValidationLevel = ValidationLevel.WARN,
+    ):
+        super().__init__(
+            rule_id="require_tradeoffs",
+            name="Tradeoff Analysis",
+            severity=severity,
+            description="Design should discuss tradeoffs and implications of each option",
+            metadata={},
+        )
+
+        # Keywords indicating tradeoff discussion
+        self.tradeoff_markers = [
+            "tradeoff",
+            "trade-off",
+            "trade off",
+            "pros and cons",
+            "advantages and disadvantages",
+            "benefits and drawbacks",
+            "strength",
+            "weakness",
+            "complexity",
+            "performance",
+            "scalability",
+            "maintainability",
+            "cost",
+            "risk",
+            "vs.",
+            "versus",
+            "however",
+            "on the other hand",
+        ]
+
+    def evaluate(self, content: str) -> bool:
+        """
+        Check if design discusses tradeoffs.
+
+        Args:
+            content: Design content to check
+
+        Returns:
+            True if tradeoff discussion found
+        """
+        content_lower = content.lower()
+
+        # Count tradeoff markers
+        marker_count = 0
+        for marker in self.tradeoff_markers:
+            if marker in content_lower:
+                marker_count += 1
+
+        # Need at least 3 different tradeoff indicators
+        return marker_count >= 3
+
+
+class AllowDiagramsRule(ValidationRule):
+    """
+    Rule: Design phase can include diagrams.
+
+    Allows ASCII art, Mermaid diagrams, and architecture descriptions.
+    Specifically designed for design phase where diagrams are expected.
+    """
+
+    def __init__(
+        self,
+        severity: ValidationLevel = ValidationLevel.WARN,
+    ):
+        super().__init__(
+            rule_id="allow_diagrams",
+            name="Diagram Support",
+            severity=severity,
+            description="Design can include ASCII art and Mermaid diagrams",
+            metadata={},
+        )
+
+        # Markers indicating diagram presence
+        self.diagram_markers = [
+            "```ascii",
+            "```mermaid",
+            "┌─",
+            "├─",
+            "└─",
+            "│",
+            "graph ",
+            "flowchart ",
+            "diagram",
+            "architecture",
+            "sequence",
+            "component",
+            "deployment",
+        ]
+
+    def evaluate(self, content: str) -> bool:
+        """
+        Check if design includes architectural descriptions/diagrams.
+
+        Args:
+            content: Design content to check
+
+        Returns:
+            True if diagrams or architecture descriptions found
+        """
+        content_lower = content.lower()
+
+        # Count diagram indicators
+        diagram_count = 0
+        for marker in self.diagram_markers:
+            if marker in content_lower:
+                diagram_count += 1
+
+        # At least one diagram indicator is good
+        # This is permissive - just checking that architecture is described
+        return diagram_count >= 1
