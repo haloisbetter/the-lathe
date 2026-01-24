@@ -17,6 +17,15 @@ Functions:
 All functions are stateless and deterministic.
 """
 
+import sys
+import os
+from pathlib import Path
+
+# Make lathe package discoverable when tool is loaded by OpenWebUI
+_tool_dir = Path(__file__).parent.resolve()
+if str(_tool_dir) not in sys.path:
+    sys.path.insert(0, str(_tool_dir))
+
 from typing import Any, Dict, List, Optional
 import json
 
