@@ -72,6 +72,17 @@ def main():
     get_parser = context_subparsers.add_parser("get", help="Retrieve exact code context")
     get_parser.add_argument("path_spec", help="File path and line range (path:start-end)")
 
+    # Step 1: RAG preview command
+    rag_parser = subparsers.add_parser("rag", help="Agent-side RAG commands")
+    rag_subparsers = rag_parser.add_subparsers(dest="rag_command")
+    rag_preview = rag_subparsers.add_parser("preview", help="Preview retrieved evidence for a task")
+    rag_preview.add_argument("description", help="Task description")
+
+    # Step 2: Think command
+    think_parser = subparsers.add_parser("think", help="Model reasoning layer")
+    think_parser.add_argument("description", help="Task description")
+    think_parser.add_argument("--why", required=True, help="Path to WHY JSON file or inline JSON string")
+
     args = parser.parse_args()
 
     if args.command == "init-config":
@@ -116,6 +127,50 @@ def main():
                 print(f"{line_num:4} | {content}")
         except Exception as e:
             print(f"Error: {e}")
+        return
+
+    if args.command == "rag" and args.rag_command == "preview":
+        from lathe.rag import retrieve_rag_evidence
+        evidence = retrieve_rag_evidence(args.description)
+        print(f"--- RAG Evidence for: {args.description} ---")
+        if not evidence:
+            print("No evidence found.")
+        else:
+            for item in evidence:
+                print(f"\n[{item['path']}] {item['range']}")
+                print(f"Reason: {item['reason']}")
+                print(f"Hash: {item['hash']}")
+                for line_num, content in item['content']:
+                    print(f"{line_num:4} | {content}")
+        return
+
+    if args.command == "think":
+        from lathe.rag import retrieve_rag_evidence
+        from lathe.agent import AgentReasoning
+        from lathe.exec import validate_why_input
+        
+        try:
+            why_data = validate_why_input(args.why)
+        except Exception as e:
+            print(f"WHY Validation Failed: {e}")
+            sys.exit(1)
+            
+        evidence = retrieve_rag_evidence(args.description)
+        agent = AgentReasoning()
+        reasoning = agent.think(args.description, why_data, evidence)
+        
+        print(f"--- Reasoning for: {args.description} ---")
+        print("\nProposed Plan:")
+        for step in reasoning['proposed_plan']:
+            print(f"  {step}")
+        
+        print("\nAssumptions:")
+        for asm in reasoning['assumptions']:
+            print(f"  - {asm}")
+            
+        print("\nEvidence References:")
+        for ref in reasoning['evidence_references']:
+            print(f"  - {ref}")
         return
 
     if args.command == "exec":

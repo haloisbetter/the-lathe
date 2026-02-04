@@ -1,0 +1,133 @@
+PHASE 5 — LATHE CLI: AGENT RAG + MODEL REASONING (DB-IMMUNE)
+
+PROJECT CONTEXT
+- Python CLI project
+- Python 3.11+
+- No frontend
+- No web server
+- No HTTP APIs
+- WHY engine implemented
+- Folder context ledger auto-updates
+- Safe command execution implemented
+- Controlled patch application implemented
+- Filesystem-only repo search implemented
+- Deterministic context retrieval implemented
+- lathe.yml is the primary configuration file
+- Deployment environment MAY auto-create a production database
+- Any database MUST be ignored completely
+
+ABSOLUTE CONSTRAINTS (NON-NEGOTIABLE)
+- Do NOT use any database (SQLite, Postgres, MySQL, Redis, etc.).
+- Do NOT import database libraries.
+- Do NOT read database-related environment variables.
+- Do NOT persist embeddings or indexes to a database.
+- Filesystem + in-memory data structures ONLY.
+- If a production database exists, it is NON-EXISTENT.
+
+GLOBAL CONSTRAINTS
+- Use ASCII only.
+- Create full, drop-in files only.
+- Do not refactor unrelated code.
+- If uncertain, STOP and explain assumptions.
+- Do not exceed 10 seconds of reasoning per step.
+- Only complete TWO steps total, then STOP.
+
+OPERATING RULES
+- Produce a short PLAN first (max 6 steps).
+- Mark each step as: safe / risky / destructive.
+- Execute ONLY Step 1 and Step 2.
+- After Step 2, STOP and wait.
+
+GOAL
+Introduce agent-driven retrieval (RAG) and controlled model reasoning
+while preserving Lathe’s determinism, auditability, and filesystem authority.
+
+-------------------------------------------------
+STEP 1 (safe): Agent-Side RAG (Filesystem-First)
+-------------------------------------------------
+
+Objectives:
+- Allow Lathe to retrieve relevant code context automatically.
+- Use ONLY existing repo search + deterministic context retrieval.
+- No embeddings yet.
+
+Actions:
+- Create a new module:
+  - lathe/rag.py
+- Implement an agent retrieval pipeline that:
+  - Accepts a task description (string)
+  - Uses repo search to identify candidate files
+  - Selects top-N relevant snippets (configurable, default 5)
+  - Retrieves exact line ranges using the context subsystem
+- Each retrieved item must include:
+  - file path
+  - line range
+  - snippet content
+  - content hash
+  - reason for inclusion
+- Add a CLI command:
+  - `lathe rag preview "<task description>"`
+- Output:
+  - structured list of retrieved evidence
+- Do NOT persist results.
+- Do NOT write to ledgers.
+- Do NOT call models yet.
+
+Deliverables:
+- lathe/rag.py (complete)
+- CLI command wired into lathe/cli
+- README.md updated with RAG preview usage
+
+-------------------------------------------------
+STEP 2 (risky): Model Reasoning Layer (Local + Paid)
+-------------------------------------------------
+
+Objectives:
+- Introduce model-based reasoning WITHOUT giving the model control.
+- Lathe remains the decision-maker.
+
+Actions:
+- Create a new module:
+  - lathe/agent.py
+- Implement:
+  - a reasoning interface that accepts:
+    - task
+    - WHY record
+    - RAG evidence
+  - model selection logic:
+    - local model for exploratory reasoning
+    - paid model for risky decisions
+- Models are invoked ONLY for reasoning:
+  - planning
+  - explanation
+  - decision justification
+- Models are NOT allowed to:
+  - execute commands
+  - modify files
+  - apply patches
+- Add a CLI command:
+  - `lathe think "<task description>" --why <why_input>`
+- Output:
+  - proposed plan
+  - references to retrieved evidence
+  - explicit assumptions
+- Do NOT auto-execute anything.
+- Do NOT update ledgers yet.
+
+Deliverables:
+- lathe/agent.py (complete)
+- CLI command wired into lathe/cli
+- README.md updated with reasoning workflow
+
+-------------------------------------------------
+STOP
+-------------------------------------------------
+
+After completing Step 2:
+- STOP execution.
+- Do NOT integrate:
+  - OpenWebUI
+  - auto-execution loops
+  - patch generation
+  - databases
+- Wait for the next instruction.

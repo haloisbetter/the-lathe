@@ -68,6 +68,12 @@ python -m lathe repo search "bootstrap"
 
 # Context: Retrieve exact code context with line numbers and hash
 python -m lathe context get lathe/main.py:1-20
+
+# RAG: Preview retrieved evidence for a task
+python -m lathe rag preview "Implement database-free search"
+
+# Think: Model reasoning layer (placeholder for model interaction)
+python -m lathe think "Implement database-free search" --why why.json
 ```
 
 ## Folder Context Ledger
