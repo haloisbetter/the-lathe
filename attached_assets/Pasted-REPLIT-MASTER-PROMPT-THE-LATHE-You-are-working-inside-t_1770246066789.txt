@@ -1,0 +1,124 @@
+REPLIT MASTER PROMPT — THE LATHE
+
+You are working inside the repository "the-lathe".
+Make ONLY the changes explicitly requested below.
+Do NOT refactor, redesign, or add features beyond scope.
+
+The goal is to:
+1) Fix a failing test assumption
+2) Add a minimal HTTP agent entrypoint so OpenWebUI can act as a frontend
+
+==================================================
+PART 1 — FIX FAILING TEST ASSUMPTION
+==================================================
+
+Problem:
+The test `test_deterministic_propose` assumes that `lathe propose`
+always produces a proposal.
+
+This assumption is no longer valid.
+
+Lathe is allowed to:
+- deterministically refuse proposals
+- treat refusal as a correct, successful outcome
+
+The test must reflect this.
+
+File to modify:
+tests/cli/test_deterministic.py
+
+Required change:
+Update the test so it passes if EITHER of the following appears in stdout:
+
+- "Proposal 1 (File:"
+- "Proposal failed due to security constraints"
+
+Do NOT change anything else in the test.
+Do NOT weaken unrelated assertions.
+
+Acceptance:
+Running `pytest -q` must pass with zero failures.
+
+==================================================
+PART 2 — ADD OPENWEBUI → LATHE AGENT ENTRYPOINT
+==================================================
+
+Goal:
+Expose Lathe as a local HTTP agent so OpenWebUI can call it.
+
+This is a THIN ADAPTER ONLY.
+No business logic changes.
+
+Hard rules:
+- Do NOT modify existing Lathe logic
+- Do NOT weaken guardrails
+- Do NOT bypass allowlist / denylist
+- Do NOT modify docs, Makefiles, or configs
+- Do NOT allow file writes or shell execution
+- Use Python standard library ONLY
+
+You MAY:
+- Add a new Python file
+- Import existing Lathe internals
+
+File to create:
+lathe/server.py
+
+Server requirements:
+- Use Python standard library only
+- Implement a simple HTTP server
+- Expose exactly ONE endpoint:
+
+POST /agent
+
+Request JSON format:
+{
+  "intent": "propose | think | context | rag",
+  "task": "string",
+  "why": { "structured why object" }
+}
+
+Behavior:
+Route based on intent:
+- propose → Lathe propose engine
+- think → Lathe think engine
+- context → deterministic context retrieval
+- rag → RAG retrieval (respect conceptual/actionable split)
+
+Response rules:
+- JSON only
+- Return ONE of:
+  - proposal output
+  - refusal explanation
+  - reasoning output
+
+All guardrails MUST remain enforced.
+No new permissions. No shortcuts.
+
+==================================================
+CLI COMPATIBILITY (MANDATORY)
+==================================================
+
+- `python -m lathe propose ...` must work unchanged
+- All existing CLI tests must continue to pass
+
+==================================================
+VERIFICATION CHECKLIST
+==================================================
+
+Before stopping, ensure:
+- pytest -q passes
+- test_deterministic_propose accepts refusal
+- lathe/server.py runs without error
+- No documentation files were touched
+- No guardrails were weakened
+
+==================================================
+OUTPUT RULES
+==================================================
+
+- Make only necessary code changes
+- No explanations
+- No summaries
+- No TODOs
+- Stop immediately when finished

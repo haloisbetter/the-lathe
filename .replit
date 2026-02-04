@@ -18,6 +18,10 @@ author = "agent"
 task = "workflow.run"
 args = "Lathe CLI"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Lathe Agent Server"
+
 [[workflows.workflow]]
 name = "Lathe CLI"
 author = "agent"
@@ -29,5 +33,21 @@ args = "python -m lathe.main"
 [workflows.workflow.metadata]
 outputType = "console"
 
+[[workflows.workflow]]
+name = "Lathe Agent Server"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python -m lathe.server"
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
+
 [deployment]
 deploymentTarget = "cloudrun"
+
+[[ports]]
+localPort = 5000
+externalPort = 80
