@@ -1,0 +1,78 @@
+You are working inside the repository `the-lathe`.
+
+CURRENT STATE
+-------------
+• lathe/server.py is live and stable
+• Refusal format is finalized and correct:
+  {
+    "refusal": true,
+    "reason": "...",
+    "details": "...",
+    "results": []
+  }
+• All 63 tests are passing
+• OpenWebUI is NOT wired yet
+• Lathe is deterministic and guardrail-safe
+
+NEXT GOAL
+---------
+Make Lathe feel *native* to OpenWebUI without weakening any guarantees.
+
+STEP 1 — OpenWebUI Tool Compatibility Layer (NO UI YET)
+-------------------------------------------------------
+Add a **single compatibility adjustment** so OpenWebUI function-calling
+can consume Lathe responses without adapters.
+
+Rules:
+• DO NOT change the refusal schema
+• DO NOT change existing tests
+• DO NOT add new dependencies
+• DO NOT add business logic
+• ONLY normalize output shape when needed
+
+What to do:
+• Ensure every successful /agent response always includes:
+  - "results": []  (even on success)
+• This allows OpenWebUI tools to treat success and refusal uniformly
+• Refusals already comply — success must now match
+
+Acceptance:
+• tests/test_agent_contract.py still passes
+• pytest -q passes
+• No CLI behavior changes
+
+STEP 2 — Minimal OpenWebUI Tool Handshake (Code Only)
+-----------------------------------------------------
+Add a small helper (new file allowed) that documents, in code, the
+expected OpenWebUI → Lathe payload and response contract.
+
+Rules:
+• NO documentation files
+• NO README changes
+• NO comments explaining OpenWebUI UI steps
+• Code only, preferably a small schema / validator / example module
+
+Purpose:
+• Acts as a single source of truth for the agent contract
+• Makes future OpenWebUI wiring trivial
+• Zero runtime impact
+
+DELIVERABLE
+-----------
+• Updated server success responses include "results"
+• One small helper/module capturing the OpenWebUI ↔ Lathe contract
+• All tests green
+
+NON-GOALS
+---------
+• No UI configuration
+• No OpenWebUI screenshots
+• No new endpoints
+• No refactors
+
+IMPORTANT
+---------
+If something *feels* like business logic, stop.
+This step is about *shape*, not *behavior*.
+
+Proceed.

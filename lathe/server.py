@@ -86,6 +86,10 @@ class LatheHandler(http.server.BaseHTTPRequestHandler):
                 self._send_structured_refusal(f"Unknown intent: {intent}")
                 return
 
+            # Normalize: ensure "results" key exists for OpenWebUI compatibility
+            if "results" not in response_data:
+                response_data["results"] = []
+            
             self.send_response(200)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
