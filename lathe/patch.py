@@ -34,7 +34,7 @@ def validate_patch(patch_content: str) -> List[str]:
             
     return list(target_files)
 
-def apply_patch(patch_path: Path, why_data: dict, proposal_summary: str = None) -> Tuple[bool, str]:
+def apply_patch(patch_path: Path, why_data: dict, proposal_summary: str = "") -> Tuple[bool, str]:
     """Apply a patch using the system 'patch' command."""
     try:
         # Check if patch command exists
