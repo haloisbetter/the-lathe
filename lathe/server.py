@@ -7,16 +7,16 @@ from lathe.agent import AgentReasoning
 from lathe.exec import validate_why_input
 
 class LatheHandler(http.server.BaseHTTPRequestHandler):
-    def _send_structured_refusal(self, message, details=None):
-        self.send_response(200)  # Refusal is a successful deterministic outcome
+    def _send_structured_refusal(self, reason, details=None):
+        """Return structured refusal. Refusal is a successful deterministic outcome."""
+        self.send_response(200)
         self.send_header('Content-Type', 'application/json')
         self.end_headers()
         self.wfile.write(json.dumps({
-            "refusal": message,
+            "refusal": True,
+            "reason": reason,
             "details": details or "",
-            "proposals": [],
-            "assumptions": [],
-            "risks": []
+            "results": []
         }).encode('utf-8'))
 
     def do_POST(self):

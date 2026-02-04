@@ -126,8 +126,10 @@ def test_missing_fields_returns_structured_refusal(agent_server):
     status, body = make_request(agent_server, payload)
     
     assert status == 200  # Refusal is a successful outcome
-    assert "refusal" in body
-    assert "Missing required fields" in body["refusal"]
+    assert body.get("refusal") is True
+    assert "reason" in body
+    assert "Missing required fields" in body["reason"]
+    assert "results" in body
     assert "Traceback" not in json.dumps(body)
 
 def test_invalid_why_returns_structured_refusal(agent_server):
@@ -140,8 +142,10 @@ def test_invalid_why_returns_structured_refusal(agent_server):
     status, body = make_request(agent_server, payload)
     
     assert status == 200
-    assert "refusal" in body
-    assert "Invalid 'why' object" in body["refusal"]
+    assert body.get("refusal") is True
+    assert "reason" in body
+    assert "Invalid 'why' object" in body["reason"]
+    assert "results" in body
     assert "Traceback" not in json.dumps(body)
 
 def test_unknown_intent_returns_structured_refusal(agent_server):
@@ -163,6 +167,8 @@ def test_unknown_intent_returns_structured_refusal(agent_server):
     status, body = make_request(agent_server, payload)
     
     assert status == 200
-    assert "refusal" in body
-    assert "Unknown intent" in body["refusal"]
+    assert body.get("refusal") is True
+    assert "reason" in body
+    assert "Unknown intent" in body["reason"]
+    assert "results" in body
     assert "Traceback" not in json.dumps(body)
