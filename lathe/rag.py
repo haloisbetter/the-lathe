@@ -1,6 +1,7 @@
 import os
 from lathe.repo import search_repo
-from lathe.context.builder import get_file_context
+from lathe.context.builder import get_file_context_from_lines
+from pathlib import Path
 
 def retrieve_rag_evidence(task_description: str, top_n: int = 5):
     """
@@ -25,12 +26,11 @@ def retrieve_rag_evidence(task_description: str, top_n: int = 5):
                 candidate_results.append(res)
     
     # Sort by some relevance? For now, just take top_n
-    # We could count how many keywords matched per file/line.
     selected = candidate_results[:top_n]
     
     evidence = []
     for item in selected:
-        path = item['path']
+        path_str = item['path']
         line = item['line']
         
         # Determine range: 5 lines before and after
@@ -38,17 +38,26 @@ def retrieve_rag_evidence(task_description: str, top_n: int = 5):
         end = line + 5
         
         try:
+            file_path = Path(path_str)
+            if not file_path.exists():
+                continue
+                
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                all_lines = f.readlines()
+            
             if line == 0: # Filename match
                 # Just get the first 10 lines
-                ctx = get_file_context(f"{path}:1-10")
+                ctx = get_file_context_from_lines(path_str, all_lines, 1, 10)
                 reason = "Filename match"
+                actual_start, actual_end = 1, 10
             else:
-                ctx = get_file_context(f"{path}:{start}-{end}")
+                ctx = get_file_context_from_lines(path_str, all_lines, start, end)
                 reason = f"Content match for keyword in line {line}"
+                actual_start, actual_end = start, end
             
             evidence.append({
                 "path": ctx['path'],
-                "range": f"{start}-{end}" if line > 0 else "1-10",
+                "range": f"{actual_start}-{actual_end}",
                 "content": ctx['lines'],
                 "hash": ctx['hash'],
                 "reason": reason
