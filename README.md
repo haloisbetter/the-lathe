@@ -82,6 +82,26 @@ python -m lathe propose "Add logging to repo search" --why why.json
 python -m lathe apply --why why.json --patch proposed_changes.patch
 ```
 
+## Continuous Integration & Testing
+
+### Running Tests Locally
+```bash
+# Run all tests (smoke + deterministic)
+pytest
+
+# Run only CLI smoke tests
+pytest tests/cli/test_smoke.py
+
+# Run only deterministic reasoning/proposal tests
+pytest tests/cli/test_deterministic.py
+```
+
+### CI Pipeline
+Lathe uses a GitHub Actions workflow (`.github/workflows/ci.yml`) to ensure:
+- Python 3.11 compatibility
+- Zero database dependency
+- Command-line stability across environments
+
 ## Folder Context Ledger
 
 Lathe uses `.lathe.md` files for persistent folder-level memory. Use `lathe ledger show` to resolve and view the context for any path. Successful and failed `exec` and `apply` operations are automatically appended to the ledger.

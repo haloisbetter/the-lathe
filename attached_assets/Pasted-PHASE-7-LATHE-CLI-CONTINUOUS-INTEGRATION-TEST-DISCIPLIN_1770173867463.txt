@@ -1,0 +1,133 @@
+PHASE 7 — LATHE CLI: CONTINUOUS INTEGRATION & TEST DISCIPLINE
+
+PROJECT CONTEXT
+- Python CLI project
+- Python 3.11+
+- No frontend
+- No web server
+- No HTTP APIs
+- WHY engine enforced
+- Folder context ledger auto-updates
+- Safe command execution implemented
+- Controlled patch proposal + approval loop implemented
+- Filesystem-only repo awareness implemented
+- Deterministic context retrieval implemented
+- Agent-side RAG implemented (filesystem-first)
+- Model reasoning implemented (reasoning-only)
+- Patch proposal + human approval implemented
+- lathe.yml is the primary configuration file
+- Deployment environment MAY auto-create a production database
+- Any database MUST be ignored completely
+
+ABSOLUTE CONSTRAINTS (NON-NEGOTIABLE)
+- Do NOT use any database.
+- Do NOT mock or stub databases.
+- Do NOT introduce background agents.
+- Do NOT introduce web frameworks or HTTP servers.
+- Filesystem + CLI remain authoritative.
+- CI must run purely from the CLI.
+
+GLOBAL CONSTRAINTS
+- Use ASCII only.
+- Create full, drop-in files only.
+- Do not refactor unrelated code.
+- If uncertain, STOP and explain assumptions.
+- Do not exceed 10 seconds of reasoning per step.
+- Only complete TWO steps total, then STOP.
+
+OPERATING RULES
+- Produce a short PLAN first (max 6 steps).
+- Mark each step as: safe / risky / destructive.
+- Execute ONLY Step 1 and Step 2.
+- After Step 2, STOP and wait.
+
+GOAL
+Prove that Lathe is:
+- testable
+- deterministic
+- safe to evolve
+before any UI or automation is added.
+
+-------------------------------------------------
+STEP 1 (safe): Establish CI Test Matrix (CLI-Only)
+-------------------------------------------------
+
+Objectives:
+- Make Lathe verifiable in any environment.
+- Ensure regressions are caught immediately.
+
+Actions:
+- Add a CI configuration using GitHub Actions (or equivalent):
+  - Python 3.11
+  - No services
+  - No databases
+- CI must run:
+  - lint (if present)
+  - pytest
+  - basic CLI smoke tests
+- Add a tests/cli/ directory with tests that:
+  - run `lathe --help`
+  - run `lathe why example`
+  - run `lathe ledger show .`
+  - run `lathe repo search lathe`
+  - run `lathe rag preview "test task"`
+- Assert:
+  - exit code == 0
+  - output contains expected markers
+- Ensure tests do NOT depend on:
+  - network access
+  - external models
+  - OpenWebUI
+  - databases
+
+Deliverables:
+- CI workflow file (complete)
+- New CLI smoke tests
+- README.md updated with CI instructions
+
+-------------------------------------------------
+STEP 2 (safe): Deterministic Test Fixtures & Golden Outputs
+-------------------------------------------------
+
+Objectives:
+- Ensure Lathe outputs are stable and auditable.
+- Prevent “LLM drift” from breaking tests later.
+
+Actions:
+- Introduce test fixtures:
+  - small sample repo under tests/fixtures/
+  - includes:
+      code files
+      .lathe.md
+      lathe.yml
+- Add tests that:
+  - run `lathe think` against the fixture
+  - run `lathe propose` against the fixture
+- Assert against:
+  - structured output shape
+  - presence of evidence references
+  - presence of WHY fields
+- Do NOT snapshot full text.
+- Assert semantics, not phrasing.
+- Explicitly mark these tests as:
+  - deterministic
+  - no-model-required (use stub reasoning if needed)
+
+Deliverables:
+- tests/fixtures/ populated
+- tests validating agent + RAG + propose pipeline
+- README.md updated with “How to run tests locally”
+
+-------------------------------------------------
+STOP
+-------------------------------------------------
+
+After completing Step 2:
+- STOP execution.
+- Do NOT add:
+  - OpenWebUI integration
+  - automation loops
+  - new features
+- Run tests locally.
+- Validate CI passes.
+- Only proceed after manual verification.

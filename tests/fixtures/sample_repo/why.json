@@ -1,0 +1,1 @@
+{"goal": "Test deterministic reasoning", "context": "Lathe fixture environment", "evidence": "No evidence needed for smoke test", "decision": "Run a propose command", "risk_level": "Low", "options_considered": ["Test option"], "guardrails": ["Test guardrail"], "verification_steps": ["Test verification"]}
