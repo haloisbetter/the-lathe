@@ -1,0 +1,102 @@
+PHASE 9 — LATHE CLI: PATCH SECURITY CLOSURE & ABUSE TESTING
+
+PROJECT CONTEXT
+- Python CLI project
+- Deterministic, filesystem-only architecture
+- WHY engine enforced
+- Human-gated patch proposal + apply
+- Hardened patch application with dry-run verification
+- Comprehensive patch fixtures already exist
+- CI passing and deterministic
+
+ABSOLUTE CONSTRAINTS (NON-NEGOTIABLE)
+- Do NOT add new features.
+- Do NOT add OpenWebUI integration.
+- Do NOT add background agents.
+- Do NOT add databases.
+- Do NOT loosen any existing safety checks.
+- Filesystem remains the sole source of truth.
+
+GLOBAL CONSTRAINTS
+- Use ASCII only.
+- Create full, drop-in files only.
+- Do not refactor unrelated code.
+- If uncertain, STOP and explain assumptions.
+- Do not exceed 10 seconds of reasoning per step.
+- Only complete TWO steps total, then STOP.
+
+OPERATING RULES
+- Produce a short PLAN first (max 6 steps).
+- Mark each step as: safe / risky / destructive.
+- Execute ONLY Step 1 and Step 2.
+- After Step 2, STOP and wait.
+
+GOAL
+Eliminate remaining patch-based abuse vectors and
+prove Lathe behaves safely under hostile or malformed input.
+
+-------------------------------------------------
+STEP 1 (safe): Patch Abuse Surface Closure
+-------------------------------------------------
+
+Objectives:
+- Ensure patch application cannot be exploited or coerced.
+
+Actions:
+- Further harden lathe/patch.py to:
+  - Reject patches that:
+      * modify files outside the repo root via symlinks
+      * reference renamed files with ambiguous paths
+      * include file permission or mode changes
+  - Explicitly disallow:
+      * file creation outside existing directories
+      * patch metadata attempting to alter ownership
+- Add explicit guards against:
+  - symlink traversal
+  - race conditions between dry-run and apply
+- Ensure:
+  - all checks occur BEFORE user confirmation
+  - final apply re-validates assumptions
+
+Deliverables:
+- Updated lathe/patch.py (complete)
+- Inline comments explaining each security guard
+- README.md updated with “Explicitly Disallowed Patch Behaviors”
+
+-------------------------------------------------
+STEP 2 (safe): Adversarial Patch Test Suite
+-------------------------------------------------
+
+Objectives:
+- Encode attacker thinking into tests.
+- Prevent future regressions.
+
+Actions:
+- Add new fixtures under tests/fixtures/patching/abuse/:
+  - symlink escape attempt
+  - permission change attempt
+  - filename spoofing (similar paths)
+  - TOCTOU-style patch (modified between preview and apply)
+- Add pytest cases that assert:
+  - patches are rejected deterministically
+  - no filesystem changes occur
+  - ledger records failures accurately
+- Ensure tests:
+  - are deterministic
+  - do not rely on timing flukes
+  - run fully offline
+
+Deliverables:
+- New abuse-focused fixtures
+- New pytest cases
+- CI remains green
+
+-------------------------------------------------
+STOP
+-------------------------------------------------
+
+After completing Step 2:
+- STOP execution.
+- Run tests locally.
+- Verify CI passes.
+- Pause further development.

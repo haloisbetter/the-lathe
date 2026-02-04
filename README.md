@@ -89,6 +89,14 @@ Lathe enforces strict safety during code modification:
 - **Atomic-ish Logging**: Folder ledgers are only updated after verification and application results are confirmed.
 - **No Partial Writes**: Failure at dry-run or application stage prevents unintended file mutations.
 
+## Explicitly Disallowed Patch Behaviors
+To ensure repository integrity, Lathe explicitly rejects patches that attempt:
+- **Symlink Escapes**: Modifying files outside the repository root via symlinks.
+- **Permission Changes**: Altering file modes or ownership (ASCII metadata in diffs).
+- **Ambiguous Pathing**: Referencing files with absolute paths or `..` traversal.
+- **Orphan Creation**: Creating files in non-existent parent directories.
+- **Symlink Mutation**: Directly patching or replacing symlinks.
+
 ## Continuous Integration & Testing
 
 ### Running Tests Locally
