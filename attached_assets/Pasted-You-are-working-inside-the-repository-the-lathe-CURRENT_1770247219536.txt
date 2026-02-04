@@ -1,0 +1,55 @@
+You are working inside the repository "the-lathe".
+
+CURRENT STATE (DO NOT CHANGE):
+- All existing tests pass.
+- Lathe enforces deterministic behavior and strict guardrails.
+- Deterministic refusals are valid outcomes.
+- lathe/server.py exists and exposes POST /agent using ONLY the Python standard library.
+- File targeting guardrails are enforced (code allowed, docs denied).
+- RAG is split into conceptual vs actionable channels.
+
+YOUR TASK:
+Make minimal, surgical changes to improve agent integration readiness without weakening any guarantees.
+
+OBJECTIVES (IN ORDER):
+1. Adjust deterministic assumptions ONLY where required:
+   - Ensure agent-facing behavior is explicit when a request is refused.
+   - Refusals must be structured, deterministic, and testable.
+   - A refusal is a SUCCESSFUL outcome, not an error.
+
+2. Harden the OpenWebUI → Lathe boundary:
+   - Ensure lathe/server.py accepts a single JSON payload with:
+     - intent
+     - task
+     - why (object)
+   - Validate inputs defensively.
+   - Invalid or missing fields must return a structured refusal, not a traceback.
+
+3. Preserve strict separation of concerns:
+   - server.py must NOT contain business logic.
+   - server.py must only delegate to existing Lathe engines.
+   - No new persistence, no globals, no side effects.
+
+4. Improve test clarity (ONLY if necessary):
+   - Update or add tests ONLY when they reflect the intended deterministic behavior.
+   - Do NOT loosen tests to “make them pass”.
+   - Do NOT modify documentation, markdown files, Makefiles, or config files.
+
+HARD CONSTRAINTS (ABSOLUTE):
+- Do NOT modify *.md, docs/, Makefile, package.json, or deployment files.
+- Do NOT introduce non-stdlib dependencies.
+- Do NOT bypass guardrails under any condition.
+- Do NOT add “auto-fix” or heuristic behavior.
+- Do NOT change CLI behavior unless explicitly required by tests.
+
+WHAT GOOD LOOKS LIKE:
+- OpenWebUI can call POST /agent safely.
+- Lathe responds deterministically every time.
+- Refusals are explicit, structured, and intentional.
+- All tests pass.
+- The system remains boring, predictable, and hard to misuse.
+
+If no safe code change is required, respond with:
+"NO CHANGE REQUIRED — SYSTEM IS CORRECT"
+
+Proceed carefully. Determinism > convenience.
