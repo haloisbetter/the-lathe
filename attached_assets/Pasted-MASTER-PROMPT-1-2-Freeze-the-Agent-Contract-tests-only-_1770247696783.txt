@@ -1,0 +1,65 @@
+MASTER PROMPT 1/2 — Freeze the Agent Contract (tests only)
+
+You are working inside the existing repo for “the-lathe”.
+
+Goal (Step 1):
+Freeze the /agent HTTP contract so OpenWebUI can’t drift it later.
+
+Hard requirements:
+- Only add/modify TESTS. Do NOT change application code in this prompt.
+- Use pytest.
+- Standard library only inside tests (requests is not allowed unless already in deps).
+- The test must treat deterministic refusals as SUCCESS (refusal is a valid outcome).
+- The test must be deterministic and not depend on external network, OpenRouter, or Ollama.
+
+What to implement:
+1) Add a new pytest file (or extend existing server/guardrail tests if present) that exercises the HTTP agent adapter contract.
+2) The test should start the server in-process (preferred) or as a subprocess (acceptable) on an ephemeral port.
+3) Send POST /agent with a minimal valid JSON body:
+   - intent: string (e.g. "propose" or "think")
+   - task: string
+   - why: object (with the expected keys used by Lathe, can be minimal but valid)
+4) Assertions:
+   - HTTP status is 200 for valid requests
+   - Response parses as JSON
+   - Response matches the “structured response” schema:
+       * Must contain either a non-empty "result"/"results" field OR a "refusal" field (refusal allowed)
+       * Must NOT crash or return traceback
+   - Add a second case: invalid payload (missing fields) returns a structured refusal (and NOT a traceback). Status code can be 400 or 200 depending on existing design, but refusal must be present.
+
+Constraints:
+- Do not make assumptions about exact field names beyond what the current server returns. Inspect lathe/server.py and match it.
+- If the server is not importable in tests, use subprocess to run "python -m lathe server ..." if a CLI exists; otherwise, run the module directly.
+- Keep the tests fast (<2s ideally).
+
+Deliverables:
+- The exact file(s) changed with full contents shown.
+- A short note on how to run only these tests (pytest path).
+
+After changes:
+- Run pytest locally (or at least explain what command you ran) and ensure the suite still passes.
+
+
+MASTER PROMPT 2/2 — OpenWebUI Tool Definition (artifact only)
+
+Goal (Step 2):
+Create the OpenWebUI “Tool” definition JSON that calls Lathe’s POST /agent endpoint.
+
+Hard requirements:
+- Do NOT change any Python code in this prompt.
+- Output ONE JSON object that OpenWebUI can use for a tool/function definition.
+- Tool must require exactly: intent, task, why.
+- No auto-routing or provider logic; this tool just calls our endpoint.
+- Use a configurable base URL with a placeholder like: http://HOST:PORT/agent
+
+Tool behavior:
+- POST to /agent
+- Content-Type: application/json
+- Body includes intent, task, why
+- Return the response JSON as-is (OpenWebUI displays it)
+
+Deliverables:
+- Print the tool JSON only (no commentary).
+- Also include a minimal example payload (as JSON) right after, separated by a blank line.
+
+Then stop.
