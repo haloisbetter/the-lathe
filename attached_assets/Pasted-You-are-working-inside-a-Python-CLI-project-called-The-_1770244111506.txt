@@ -1,0 +1,86 @@
+You are working inside a Python CLI project called “The Lathe”.
+
+Context:
+The Lathe is an agentic development control layer with strict architectural guarantees:
+- Deterministic execution
+- Human-gated patches
+- Filesystem-only RAG
+- No hidden side effects
+- Explicit boundaries between subsystems
+
+Current Problem:
+The `lathe propose` command consistently generates patches that modify documentation files
+(.md, Makefile, package.json) even when the task explicitly requests adding Python tests.
+
+This behavior is incorrect.
+
+Root Cause (important):
+The proposal stage currently lacks a **hard code-vs-docs boundary**.
+The agent relies on RAG keyword relevance alone, which overweights documentation files.
+
+Your task is to FIX THIS AT THE LATHE LEVEL — not by better wording, not by model changes.
+
+--------------------------------
+REQUIREMENTS
+--------------------------------
+
+1. Introduce a **Proposal Targeting Guardrail**
+   - Proposal generation MUST be constrained by an explicit allowlist.
+   - By default:
+     - ALLOW: `lathe/**`, `tests/**`
+     - DENY: `*.md`, `Makefile`, `package.json`, `docs/**`
+   - The allowlist must be enforced BEFORE patch generation.
+
+2. WHY Records Are Policy, Not Hints
+   - Guardrails in a WHY record must be machine-enforced.
+   - If a proposed file violates guardrails:
+     - The proposal must be rejected OR
+     - The proposal must explicitly refuse with a clear reason.
+   - Silent violations are not allowed.
+
+3. RAG Must Be Split Into Two Channels
+   Implement two distinct retrieval scopes:
+   - **Conceptual RAG**
+     - Sources: `.md`, architecture docs, design notes
+     - Used ONLY for THINK / reasoning
+   - **Actionable RAG**
+     - Sources: `.py`, test files, executable code
+     - Used ONLY for PROPOSE
+   - Proposal stage must NEVER use conceptual-only sources.
+
+4. Proposal Failure Is a Valid Outcome
+   - If no allowable files match the task:
+     - The agent must refuse to propose a patch
+     - Provide a structured explanation of why
+   - This is a success case, not an error.
+
+5. Safety and Determinism Are Non-Negotiable
+   - No automatic file writes
+   - No execution
+   - No weakening of existing patch safety checks
+   - All changes must be testable via pytest
+
+--------------------------------
+DELIVERABLES
+--------------------------------
+
+- Modify the proposal pipeline to enforce file targeting constraints
+- Update or extend RAG logic to support conceptual vs actionable separation
+- Add or update tests proving:
+  - Docs cannot be modified during proposal
+  - Code-only proposals succeed
+  - Violating proposals are rejected deterministically
+
+--------------------------------
+IMPORTANT NOTES
+--------------------------------
+
+- Do NOT “fix” this by prompt engineering
+- Do NOT rely on the model to behave correctly
+- The system must be correct even with a dumb or hostile model
+- This change should make the agent boring, predictable, and trustworthy
+
+If you need to make design decisions:
+- Prefer explicit constraints over clever heuristics
+- Prefer refusal over unsafe action
+- Prefer boring correctness over flexibility
