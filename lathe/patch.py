@@ -3,7 +3,6 @@ import subprocess
 import re
 from pathlib import Path
 from typing import List, Tuple
-from lathe.ledger import append_recent_work, append_failed_attempt
 
 MAX_FILES_PER_PATCH = 5
 
@@ -77,6 +76,8 @@ def dry_run_patch(patch_path: Path) -> Tuple[bool, str]:
 
 def apply_patch(patch_path: Path, why_data: dict, proposal_summary: str = "") -> Tuple[bool, str]:
     """Apply a patch with re-validation and race condition protection."""
+    from lathe.ledger import append_recent_work, append_failed_attempt
+    
     try:
         subprocess.run(["patch", "--version"], capture_output=True, check=True)
     except (subprocess.CalledProcessError, FileNotFoundError):

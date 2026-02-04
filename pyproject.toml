@@ -6,10 +6,14 @@ build-backend = "setuptools.build_meta"
 name = "the-lathe"
 version = "1.0.0"
 description = "Phase-locked AI development control layer with validation and orchestration"
-authors = [{name = "Lathe Project"}]
-license = {text = "ISC"}
+readme = "README.md"
 requires-python = ">=3.11"
+license = { text = "ISC" }
 dependencies = []
+
+authors = [
+    { name = "Brenton Tesh", email = "brentontesh@gmail.com" }
+]
 
 [project.optional-dependencies]
 dev = [
