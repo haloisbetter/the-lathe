@@ -74,6 +74,12 @@ python -m lathe rag preview "Implement database-free search"
 
 # Think: Model reasoning layer (placeholder for model interaction)
 python -m lathe think "Implement database-free search" --why why.json
+
+# Propose: Generate code change proposals as patches
+python -m lathe propose "Add logging to repo search" --why why.json
+
+# Apply (with Approval): Apply a proposed patch after human review
+python -m lathe apply --why why.json --patch proposed_changes.patch
 ```
 
 ## Folder Context Ledger

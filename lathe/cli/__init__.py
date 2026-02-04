@@ -78,10 +78,11 @@ def main():
     rag_preview = rag_subparsers.add_parser("preview", help="Preview retrieved evidence for a task")
     rag_preview.add_argument("description", help="Task description")
 
-    # Step 2: Think command
-    think_parser = subparsers.add_parser("think", help="Model reasoning layer")
-    think_parser.add_argument("description", help="Task description")
-    think_parser.add_argument("--why", required=True, help="Path to WHY JSON file or inline JSON string")
+    # Step 1: Propose command
+    propose_parser = subparsers.add_parser("propose", help="Generate code change proposals as patches")
+    propose_parser.add_argument("description", help="Task description")
+    propose_parser.add_argument("--why", required=True, help="Path to WHY JSON file or inline JSON string")
+    propose_parser.add_argument("--max-files", type=int, default=5, help="Maximum files to propose changes for")
 
     args = parser.parse_args()
 
@@ -173,6 +174,43 @@ def main():
             print(f"  - {ref}")
         return
 
+    if args.command == "propose":
+        from lathe.rag import retrieve_rag_evidence
+        from lathe.agent import AgentReasoning
+        from lathe.exec import validate_why_input
+        
+        try:
+            why_data = validate_why_input(args.why)
+        except Exception as e:
+            print(f"WHY Validation Failed: {e}")
+            sys.exit(1)
+            
+        evidence = retrieve_rag_evidence(args.description)
+        agent = AgentReasoning()
+        proposal = agent.propose(args.description, why_data, evidence, max_files=args.max_files)
+        
+        print(f"--- Proposal for: {args.description} ---")
+        for i, p in enumerate(proposal['proposals'], 1):
+            print(f"\nProposal {i} (File: {p['file']}):")
+            print(f"Intent: {p['intent']}")
+            print("Diff:")
+            print(p['diff'])
+            
+        print("\nAssumptions:")
+        for asm in proposal['assumptions']:
+            print(f"  - {asm}")
+            
+        print("\nRisks:")
+        for r in proposal['risks']:
+            print(f"  - {r}")
+            
+        # Write to a file for 'apply' to use easily
+        proposal_file = Path("proposed_changes.patch")
+        all_diffs = "\n".join([p['diff'] for p in proposal['proposals']])
+        proposal_file.write_text(all_diffs)
+        print(f"\nAll diffs written to {proposal_file}")
+        return
+
     if args.command == "exec":
         from lathe.exec import run_safe_command, validate_why_input
         from lathe.ledger import append_recent_work, append_failed_attempt
@@ -240,6 +278,8 @@ def main():
             
         print("--- Patch Preview ---")
         print(patch_content)
+        print("\nAssociated WHY Goal:", why_data.get("goal"))
+        print("Associated WHY Risks:", why_data.get("risks", "None specified"))
         print("\nTarget Files:")
         for f in target_files:
             print(f"  - {f}")
@@ -249,7 +289,7 @@ def main():
             print("Aborted.")
             sys.exit(0)
             
-        success, output = apply_patch(patch_path, why_data)
+        success, output = apply_patch(patch_path, why_data, proposal_summary=f"Task: {why_data.get('goal')}")
         print("\n--- Patch Result ---")
         print("Success:", success)
         print("Output:")

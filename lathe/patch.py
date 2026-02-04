@@ -34,7 +34,7 @@ def validate_patch(patch_content: str) -> List[str]:
             
     return list(target_files)
 
-def apply_patch(patch_path: Path, why_data: dict) -> Tuple[bool, str]:
+def apply_patch(patch_path: Path, why_data: dict, proposal_summary: str = None) -> Tuple[bool, str]:
     """Apply a patch using the system 'patch' command."""
     try:
         # Check if patch command exists
@@ -45,8 +45,6 @@ def apply_patch(patch_path: Path, why_data: dict) -> Tuple[bool, str]:
     try:
         # Apply patch
         # -p1 is common for git diffs
-        # Try -p0 if -p1 fails or detect? 
-        # Most unified diffs from tools are -p1 compatible if they have a/ b/
         result = subprocess.run(
             ["patch", "-p1", "-i", str(patch_path)],
             capture_output=True,
@@ -59,6 +57,9 @@ def apply_patch(patch_path: Path, why_data: dict) -> Tuple[bool, str]:
         # Update ledger
         path = "." # Assume root for now
         action = f"Applied patch from {patch_path.name}"
+        if proposal_summary:
+            action += f" (Proposal: {proposal_summary})"
+            
         goal = why_data.get("goal", "Unknown")
         command = f"patch -p1 -i {patch_path.name}"
         
