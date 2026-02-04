@@ -55,8 +55,10 @@ def validate_patch(patch_content: str) -> List[str]:
 def dry_run_patch(patch_path: Path) -> Tuple[bool, str]:
     """Performs a dry-run apply to check if hunks match target context."""
     try:
+        # Some versions of patch don't support --dry-run or -C
+        # Using -C (check) is often synonymous with --dry-run
         result = subprocess.run(
-            ["patch", "-p1", "--dry-run", "--silent", "-i", str(patch_path)],
+            ["patch", "-p1", "--dry-run", "-i", str(patch_path)],
             capture_output=True,
             text=True
         )
