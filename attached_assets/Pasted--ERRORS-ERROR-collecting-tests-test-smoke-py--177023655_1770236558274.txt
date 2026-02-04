@@ -1,0 +1,76 @@
+====================== ERRORS =======================
+_______ ERROR collecting tests/test_smoke.py ________
+import file mismatch:
+imported module 'test_smoke' has this __file__ attribute:
+  /mnt/c/Users/somet/projects/the-lathe/tests/cli/test_smoke.py
+which is not the same as the test file we want to collect:
+  /mnt/c/Users/somet/projects/the-lathe/tests/test_smoke.py
+HINT: remove __pycache__ / .pyc files and/or use a unique basename for your test file modules
+============== short test summary info ==============
+ERROR tests/test_smoke.py
+!!!!!! Interrupted: 1 error during collection !!!!!!!
+1 error in 1.51s
+(.venv) the-lathe@BrentsDesktop:/mnt/c/Users/somet/projects/the-lathe$ ollama list
+NAME                   ID              SIZE      MODIFIED
+deepseek-coder:6.7b    ce298d984115    3.8 GB    5 hours ago
+(.venv) the-lathe@BrentsDesktop:/mnt/c/Users/somet/projects/the-lathe$ ollama run deepseek-coder:6.7b "Reply with LOCAL_OK"
+LOCAL_OK
+
+
+(.venv) the-lathe@BrentsDesktop:/mnt/c/Users/somet/projects/the-lathe$ find . -name "__pycache__" -type d -exec rm -rf {} +
+find . -name "*.pyc" -delete
+(.venv) the-lathe@BrentsDesktop:/mnt/c/Users/somet/projects/the-lathe$ find . -name "*.pyc" -delete
+(.venv) the-lathe@BrentsDesktop:/mnt/c/Users/somet/projects/the-lathe$ mv tests/cli/test_smoke.py tests/cli/test_cli_smoke.py
+(.venv) the-lathe@BrentsDesktop:/mnt/c/Users/somet/projects/the-lathe$ pytest -q
+
+...............................F.F........... [ 83%]
+.........                                     [100%]
+===================== FAILURES ======================
+_ TestArchitectureCompliance.test_no_persistence_imports_context _
+
+self = <test_subsystem_verification.TestArchitectureCompliance object at 0x7a65f4042f10>
+
+    def test_no_persistence_imports_context(self):
+        """Verify context doesn't import database or file I/O libraries."""
+        import lathe.context.builder as context_module
+
+        source = open(context_module.__file__).read()
+
+        assert "import sqlite" not in source
+        assert "supabase" not in source
+>       assert "open(" not in source
+E       assert 'open(' not in '"""\nContex...() + "..."\n'
+E
+E         'open(' is contained here:
+E
+E               with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+E         ?          +++++
+E                   all_lines = f.readlines()
+E           ...
+E
+E         ...Full output truncated (177 lines hidden), use '-vv' to show
+
+tests/test_subsystem_verification.py:350: AssertionError
+__ TestSharedModelsUsage.test_shared_models_exist ___
+
+self = <test_subsystem_verification.TestSharedModelsUsage object at 0x7a65f40434d0>
+
+    def test_shared_models_exist(self):
+        """Verify all shared models are defined."""
+>       from lathe.shared.models import (
+            PromptMetadata,
+            Prompt,
+            ContextSource,
+            ContextOutput,
+            ValidationRule,
+            ValidationResult,
+        )
+E       ImportError: cannot import name 'Prompt' from 'lathe.shared.models' (/mnt/c/Users/somet/projects/the-lathe/lathe/shared/models.py)
+
+tests/test_subsystem_verification.py:368: ImportError
+============== short test summary info ==============
+FAILED tests/test_subsystem_verification.py::TestArchitectureCompliance::test_no_persistence_imports_context - assert 'open(' not in '"""\nContex...() + "..."\n'
+FAILED tests/test_subsystem_verification.py::TestSharedModelsUsage::test_shared_models_exist - ImportError: cannot import name 'Prompt' from 'l...
+2 failed, 52 passed in 5.74s
+(.venv) the-lathe@BrentsDesktop:/mnt/c/Users/somet/projects/the-lathe$
+(.venv) the-lathe@BrentsDesktop:/mnt/c/Users/somet/projects/the-lathe$

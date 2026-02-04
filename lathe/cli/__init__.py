@@ -124,9 +124,22 @@ def main():
         return
 
     if args.command == "context" and args.context_command == "get":
-        from lathe.context import get_file_context
+        from lathe.context.builder import get_file_context_from_lines
         try:
-            result = get_file_context(args.path_spec)
+            path_part, range_part = args.path_spec.rsplit(":", 1)
+            start_str, end_str = range_part.split("-")
+            start = int(start_str)
+            end = int(end_str)
+            
+            file_path = Path(path_part)
+            if not file_path.exists():
+                print(f"Error: File not found: {path_part}")
+                sys.exit(1)
+                
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                all_lines = f.readlines()
+                
+            result = get_file_context_from_lines(path_part, all_lines, start, end)
             print(f"--- File: {result['path']} ---")
             print(f"--- Hash: {result['hash']} ---")
             for line_num, content in result['lines']:

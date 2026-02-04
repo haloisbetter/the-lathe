@@ -17,6 +17,23 @@ from lathe.shared.enums import (
 
 
 @dataclass
+class Prompt:
+    """
+    Shared Prompt model.
+
+    Attributes:
+        id: Unique identifier
+        name: Human-readable name
+        content: Actual prompt content
+        metadata: Optional additional metadata
+    """
+    id: str
+    name: str
+    content: str
+    metadata: Optional[Dict[str, Any]] = None
+
+
+@dataclass
 class PromptMetadata:
     """
     Metadata for a prompt in the registry.

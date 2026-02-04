@@ -5,39 +5,23 @@ Assembles context from multiple sources with prioritization and filtering.
 """
 
 import hashlib
-from pathlib import Path
-from typing import List, Optional
+from typing import List, Optional, Tuple
 from lathe.shared.models import ContextSource, ContextOutput
 from lathe.context.sources import SourceFilter, SourcePrioritizer
 
 
-def get_file_context(path_spec, max_lines=500):
+def get_file_context_from_lines(path_part: str, all_lines: List[str], start: int, end: int, max_lines: int = 500) -> dict:
     """
-    path_spec format: path:start-end
-    Example: lathe/main.py:1-20
+    Assembles context from a list of strings (lines).
+    No file I/O occurs here.
     """
-    try:
-        path_part, range_part = path_spec.rsplit(":", 1)
-        start_str, end_str = range_part.split("-")
-        start = int(start_str)
-        end = int(end_str)
-    except ValueError:
-        raise ValueError("Invalid format. Use path:start-end (e.g., file.py:1-20)")
-
     if start < 1:
         start = 1
 
     if end - start + 1 > max_lines:
         end = start + max_lines - 1
 
-    file_path = Path(path_part)
-    if not file_path.exists():
-        raise FileNotFoundError(f"File not found: {path_part}")
-
     lines_to_return = []
-    with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
-        all_lines = f.readlines()
-
     actual_end = min(end, len(all_lines))
     content_to_hash = ""
 
