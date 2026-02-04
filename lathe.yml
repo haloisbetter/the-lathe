@@ -1,0 +1,11 @@
+database:
+  path: data/lathe.db
+  schema_path: lathe/storage/schema.sql
+logging:
+  level: INFO
+  format: '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+  file: null
+executor:
+  type: openhands
+  timeout: 300
+  options: {}

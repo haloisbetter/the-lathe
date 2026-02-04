@@ -22,46 +22,59 @@ lathe/
 ├── bootstrap/      # Temporary external agent integrations
 ├── config/         # Configuration loading and validation
 ├── logging/        # Logging setup and utilities
-└── cli/            # Command-line interface
+├── cli/            # Command-line implementation
+└── why.py          # WHY record engine
 ```
 
-## Responsibility Boundaries
+## Usage
 
-### What The Lathe DOES
-- Define task specifications
-- Orchestrate task execution
-- Persist task history
-- Provide CLI interface
-- Load configuration
-- Setup logging infrastructure
-
-### What The Lathe DOES NOT
-- Decide HOW to implement tasks (delegated to executors)
-- Contain AI reasoning logic
-- Make direct network calls (abstracted through executors)
-- Include SaaS dependencies in core
-
-### Bootstrap Phase
-Currently uses OpenHands as a bootstrap executor. This dependency is:
-- Temporary
-- Isolated to `lathe/bootstrap/`
-- Designed to be replaceable
-
-## Quick Start
-
-### Installation
+The Lathe provides a CLI for orchestration.
 
 ```bash
-# Install dependencies
-pip install -r requirements.txt
+# Run default task
+python -m lathe
 
-# Initialize configuration
-python -m lathe.main init-config
+# Initialize configuration (creates lathe.yml)
+python -m lathe init-config
 
-# Edit lathe.yml as needed
+# List all tasks
+python -m lathe list
+
+# Show task details
+python -m lathe show <task_id>
+
+# Show run details
+python -m lathe run <run_id>
+
+# Replay a task
+python -m lathe replay <task_id>
+
+# WHY Engine: Print a sample WHY record
+python -m lathe why example
 ```
 
-### Configuration
+## WHY Engine
+
+The WHY system is the foundational learning core of Lathe. Every major decision is backed by a WHY record containing:
+- **goal**: What are we trying to achieve?
+- **context**: The environment and constraints.
+- **evidence**: Data supporting the decision.
+- **options_considered**: Alternative paths.
+- **decision**: The chosen path.
+- **risk_level**: Potential impact.
+- **guardrails**: Safety measures.
+- **verification_steps**: How to prove it works.
+
+## Development
+
+Requires Python 3.11+.
+
+```bash
+# Run tests
+pytest -q
+```
+
+## Configuration
 
 Copy `lathe.example.yml` to `lathe.yml` and customize:
 
@@ -79,86 +92,6 @@ executor:
 ```
 
 Environment variable override: `LATHE_CONFIG=/path/to/config.yml`
-
-### Usage
-
-```bash
-# Run default task
-python -m lathe.main
-
-# List all tasks
-python -m lathe.main list
-
-# Show task details
-python -m lathe.main show <task_id>
-
-# Show run details
-python -m lathe.main run <run_id>
-
-# Replay a task
-python -m lathe.main replay <task_id>
-```
-
-## Development
-
-```bash
-# Run tests
-make test
-
-# Run smoke tests
-make smoke
-
-# Clean build artifacts
-make clean
-```
-
-## Data Storage
-
-All persistent data is stored in SQLite:
-- Location: `data/lathe.db` (configurable)
-- Schema: `lathe/storage/schema.sql`
-- Tables: `tasks`, `runs`
-
-## Logging
-
-Logs are configured via `lathe.yml`:
-- Console output (default)
-- Optional file output
-- Configurable levels: DEBUG, INFO, WARNING, ERROR, CRITICAL
-
-## Design Philosophy
-
-1. **Configuration over code**: Behavior is controlled via YAML
-2. **Explicit over implicit**: No magic, clear boundaries
-3. **Simple over clever**: Boring, stable solutions
-4. **Local-first**: No required external services
-5. **Minimal dependencies**: Only what's necessary
-
-## Extending The Lathe
-
-### Adding a New Executor
-
-1. Implement `BootstrapExecutor` interface
-2. Add to `lathe/bootstrap/`
-3. Register in configuration
-4. Maintain isolation from core
-
-### Adding a New CLI Command
-
-1. Add function to `lathe/cli/commands.py`
-2. Register in `lathe/main.py`
-3. Follow existing patterns
-
-## Status
-
-**Current Phase**: Bootstrap (Milestone 1)
-
-Goals:
-- ✓ Establish structure
-- ✓ Define bootstrap boundary
-- ✓ Runnable CLI
-- ✓ Configuration system
-- ✓ Logging infrastructure
 
 ## License
 

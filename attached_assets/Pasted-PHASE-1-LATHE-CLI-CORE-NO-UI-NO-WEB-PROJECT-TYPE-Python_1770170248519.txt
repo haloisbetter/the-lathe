@@ -1,0 +1,114 @@
+PHASE 1 — LATHE CLI CORE (NO UI, NO WEB)
+
+PROJECT TYPE
+- Python CLI application
+- No frontend
+- No web server
+- No FastAPI
+- No HTTP endpoints
+- Python 3.11+
+- Uses pytest and pyyaml
+- Configuration lives in lathe.yml
+
+GLOBAL CONSTRAINTS
+- This is a CLI-first engine.
+- Do NOT introduce any web frameworks.
+- Do NOT introduce a frontend.
+- Do NOT introduce async networking.
+- Use ASCII only.
+- Create full, drop-in files only (no partial snippets).
+- If unsure, STOP and explain assumptions.
+- Do not exceed 10 seconds of reasoning per step.
+- Only complete TWO steps total, then STOP.
+
+OPERATING RULES
+- Produce a short PLAN first (max 6 steps).
+- Mark each step as: safe / risky / destructive.
+- Only execute Step 1 and Step 2.
+- After Step 2, STOP and wait.
+
+GOAL
+Evolve this Python CLI project into the Lathe engine:
+- deterministic
+- auditable
+- agent-driven
+- local-first
+- suitable to be called later by OpenWebUI as a tool
+
+The Lathe CLI must eventually support:
+- task intake
+- planning
+- WHY records
+- safe command execution
+- folder-level context memory
+But NOT all at once.
+
+-------------------------------------------------
+STEP 1 (safe): Normalize and lock the CLI structure
+-------------------------------------------------
+
+Objectives:
+- Make the CLI structure explicit and stable.
+- Ensure configuration, entrypoint, and tests align.
+
+Actions:
+- Inspect existing project structure.
+- Ensure there is a clear CLI entrypoint (e.g. lathe/__main__.py or lathe/cli.py).
+- Ensure lathe.yml is treated as the primary configuration file.
+- If missing, add:
+  - a clear CLI command (e.g. `lathe run <task>` placeholder)
+  - argument parsing (argparse only)
+- Do NOT add new features yet.
+- Update README.md to reflect:
+  - CLI usage
+  - Python version
+  - how to run tests
+- Do NOT change behavior beyond structure/clarity.
+
+Deliverables:
+- Any new or modified files must be complete.
+- Tests must still run.
+
+-------------------------------------------------
+STEP 2 (safe): Introduce the WHY engine (CLI-only)
+-------------------------------------------------
+
+Objectives:
+- Add the foundational WHY system without changing existing behavior.
+- This is the learning core of Lathe.
+
+Actions:
+- Create a new module:
+  - lathe/why.py
+- Define:
+  - a WHY record schema
+  - validation logic (required fields)
+- Fields required in a WHY record:
+  - goal
+  - context
+  - evidence
+  - options_considered
+  - decision
+  - risk_level
+  - guardrails
+  - verification_steps
+- Add a CLI command:
+  - `lathe why example`
+  - Prints a sample WHY record to stdout
+- No persistence yet.
+- No RAG yet.
+- No execution yet.
+
+Deliverables:
+- lathe/why.py (complete)
+- CLI command wired into the main CLI
+- README updated with WHY explanation
+
+-------------------------------------------------
+STOP
+-------------------------------------------------
+
+After completing Step 2:
+- STOP execution.
+- Do NOT continue to sandboxing, RAG, or file IO.
+- Wait for the next instruction.
