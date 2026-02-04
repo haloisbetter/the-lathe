@@ -1,0 +1,118 @@
+PHASE 8 — LATHE CLI: PATCH HARDENING & TEST FIXTURES
+
+PROJECT CONTEXT
+- Python CLI project
+- Python 3.11+
+- No frontend
+- No web server
+- No HTTP APIs
+- WHY engine enforced
+- Filesystem-only architecture
+- Folder context ledger (.lathe.md) auto-updates
+- Safe command execution implemented
+- Patch proposal + human-gated apply implemented
+- Agent-side RAG + reasoning implemented
+- CI pipeline with deterministic tests implemented
+- All current tests passing
+
+ABSOLUTE CONSTRAINTS (NON-NEGOTIABLE)
+- Do NOT add new features.
+- Do NOT add databases.
+- Do NOT add OpenWebUI integration.
+- Do NOT add background agents.
+- Do NOT relax safety or confirmation requirements.
+- Filesystem remains the sole source of truth.
+
+GLOBAL CONSTRAINTS
+- Use ASCII only.
+- Create full, drop-in files only.
+- Do not refactor unrelated code.
+- If uncertain, STOP and explain assumptions.
+- Do not exceed 10 seconds of reasoning per step.
+- Only complete TWO steps total, then STOP.
+
+OPERATING RULES
+- Produce a short PLAN first (max 6 steps).
+- Mark each step as: safe / risky / destructive.
+- Execute ONLY Step 1 and Step 2.
+- After Step 2, STOP and wait.
+
+GOAL
+Make patch application maximally safe, predictable, and test-covered,
+so Lathe can be trusted under repeated human-in-the-loop use.
+
+-------------------------------------------------
+STEP 1 (safe): Patch Application Hardening
+-------------------------------------------------
+
+Objectives:
+- Eliminate edge cases in patch application.
+- Improve correctness and failure transparency.
+
+Actions:
+- Improve lathe/patch.py to:
+  - Validate unified diff headers more strictly:
+      * correct file paths
+      * no absolute paths
+      * no path traversal (..)
+  - Detect and reject:
+      * overlapping hunks
+      * hunks that no longer apply cleanly
+  - Perform a dry-run apply before confirmation to ensure:
+      * hunks match target context
+  - Improve error messages to include:
+      * file path
+      * hunk index
+      * reason for failure
+- Ensure:
+  - No partial file writes on failure
+  - Ledger updates occur ONLY after final success/failure
+- Do NOT change CLI flags or UX.
+
+Deliverables:
+- Updated lathe/patch.py (complete)
+- Any helper functions/modules as needed
+- README.md updated with “Patch Safety Guarantees” section
+
+-------------------------------------------------
+STEP 2 (safe): Expanded Patch & Ledger Test Fixtures
+-------------------------------------------------
+
+Objectives:
+- Prove patch safety under real failure modes.
+- Lock behavior with regression tests.
+
+Actions:
+- Add new fixtures under tests/fixtures/patching/:
+  - clean patch (applies successfully)
+  - stale patch (context mismatch)
+  - overlapping hunks patch
+  - path traversal attempt (must fail)
+- Add tests that:
+  - assert successful patch updates files correctly
+  - assert failed patch does NOT modify files
+  - assert ledger updates:
+      * Recent Work on success
+      * Failed Attempts on failure
+- Add assertions for:
+  - clear error messages
+  - correct exit codes
+- Ensure tests:
+  - run entirely locally
+  - do not require models
+  - do not rely on timing or ordering
+
+Deliverables:
+- New test fixtures (complete)
+- New pytest cases for patch + ledger behavior
+- CI remains green
+
+-------------------------------------------------
+STOP
+-------------------------------------------------
+
+After completing Step 2:
+- STOP execution.
+- Run tests locally.
+- Verify CI passes.
+- Do NOT proceed to new phases without review.

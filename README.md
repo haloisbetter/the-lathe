@@ -82,6 +82,13 @@ python -m lathe propose "Add logging to repo search" --why why.json
 python -m lathe apply --why why.json --patch proposed_changes.patch
 ```
 
+## Patch Safety Guarantees
+Lathe enforces strict safety during code modification:
+- **Strict Validation**: Rejects path traversal (`..`), absolute paths, and more than 5 files per proposal.
+- **Dry-run Verification**: Every patch is verified with `patch --dry-run` to ensure hunks match current file state before application.
+- **Atomic-ish Logging**: Folder ledgers are only updated after verification and application results are confirmed.
+- **No Partial Writes**: Failure at dry-run or application stage prevents unintended file mutations.
+
 ## Continuous Integration & Testing
 
 ### Running Tests Locally
