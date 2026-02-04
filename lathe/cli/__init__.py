@@ -78,6 +78,11 @@ def main():
     rag_preview = rag_subparsers.add_parser("preview", help="Preview retrieved evidence for a task")
     rag_preview.add_argument("description", help="Task description")
 
+    # Step 2: Think command
+    think_parser = subparsers.add_parser("think", help="Model reasoning layer")
+    think_parser.add_argument("description", help="Task description")
+    think_parser.add_argument("--why", required=True, help="Path to WHY JSON file or inline JSON string")
+
     # Step 1: Propose command
     propose_parser = subparsers.add_parser("propose", help="Generate code change proposals as patches")
     propose_parser.add_argument("description", help="Task description")
