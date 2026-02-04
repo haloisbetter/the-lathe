@@ -1,0 +1,128 @@
+PHASE 4 — LATHE CLI: REPO AWARENESS (DB-IMMUNE)
+
+PROJECT CONTEXT
+- Python CLI project
+- Python 3.11+
+- No frontend
+- No web server
+- No HTTP APIs
+- WHY engine implemented
+- Folder context ledger auto-updates
+- Safe command execution implemented
+- Controlled patch application implemented
+- lathe.yml is the primary configuration file
+- Deployment environment MAY auto-create a production database
+- That database MUST be ignored completely
+
+ABSOLUTE CONSTRAINTS (NON-NEGOTIABLE)
+- Do NOT use any database (SQLite, Postgres, MySQL, Redis, etc.).
+- Do NOT import database libraries.
+- Do NOT read from environment variables related to databases.
+- Do NOT write code that detects, initializes, migrates, or connects to a database.
+- Do NOT store state outside the filesystem.
+- The filesystem is the ONLY source of truth.
+- If a production database exists, it is considered NON-EXISTENT.
+
+GLOBAL CONSTRAINTS
+- Do NOT integrate Ollama, OpenRouter, or any LLM.
+- Do NOT introduce web frameworks.
+- Do NOT introduce async networking.
+- Use ASCII only.
+- Create full, drop-in files only.
+- Do not refactor unrelated code.
+- If uncertain, STOP and explain assumptions.
+- Do not exceed 10 seconds of reasoning per step.
+- Only complete TWO steps total, then STOP.
+
+OPERATING RULES
+- Produce a short PLAN first (max 6 steps).
+- Mark each step as: safe / risky / destructive.
+- Execute ONLY Step 1 and Step 2.
+- After Step 2, STOP and wait.
+
+GOAL
+Give Lathe deterministic, filesystem-based repo awareness so future
+agents can retrieve evidence without guessing, WITHOUT any DB or embeddings.
+
+-------------------------------------------------
+STEP 1 (safe): Filesystem-Only Repo Index & Search
+-------------------------------------------------
+
+Objectives:
+- Allow Lathe to search the repository deterministically.
+- Use ONLY filesystem traversal and in-memory data structures.
+
+Actions:
+- Create a new module:
+  - lathe/repo.py
+- Implement:
+  - recursive file discovery starting from a given root
+  - respect .gitignore if present
+  - skip binary files
+  - capture metadata in-memory only:
+    - path
+    - extension
+    - size
+    - last modified time
+- Implement keyword search:
+  - file name matching
+  - line-based content search
+- Add a CLI command:
+  - `lathe repo search <query> [--path <root>]`
+- Output results including:
+  - file path
+  - line number
+  - short snippet
+- Do NOT cache results on disk.
+- Do NOT persist indexes.
+- Do NOT use databases.
+
+Deliverables:
+- lathe/repo.py (complete)
+- CLI command wired into lathe/cli
+- README.md updated with search usage
+
+-------------------------------------------------
+STEP 2 (safe): Deterministic Context Retrieval
+-------------------------------------------------
+
+Objectives:
+- Retrieve exact code context safely and reproducibly.
+- Prepare evidence retrieval for future RAG without storing embeddings.
+
+Actions:
+- Create a new module:
+  - lathe/context.py
+- Implement:
+  - partial file reads by path + line range
+  - strict bounds checking
+  - max lines per retrieval (configurable)
+- Add a CLI command:
+  - `lathe context get <path>:<start>-<end>`
+- Output:
+  - file path
+  - extracted lines
+  - line numbers
+  - content hash (for verification)
+- Do NOT write to ledgers.
+- Do NOT integrate WHY here.
+- Do NOT store context results anywhere.
+
+Deliverables:
+- lathe/context.py (complete)
+- CLI command wired into lathe/cli
+- README.md updated with context usage
+
+-------------------------------------------------
+STOP
+-------------------------------------------------
+
+After completing Step 2:
+- STOP execution.
+- Do NOT integrate:
+  - databases
+  - embeddings
+  - vector stores
+  - models
+  - OpenWebUI
+- Wait for the next instruction.

@@ -28,3 +28,6 @@ args = "python -m lathe.main"
 
 [workflows.workflow.metadata]
 outputType = "console"
+
+[deployment]
+deploymentTarget = "cloudrun"

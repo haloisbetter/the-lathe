@@ -54,10 +54,23 @@ def main():
     exec_parser.add_argument("--timeout", type=int, default=60, help="Execution timeout in seconds")
     exec_parser.add_argument("cmd_args", nargs=argparse.REMAINDER, help="Command and arguments")
 
-    # Step 2: Apply command
+    # Apply command
     apply_parser = subparsers.add_parser("apply", help="Controlled patch application system")
     apply_parser.add_argument("--why", required=True, help="Path to WHY JSON file or inline JSON string")
     apply_parser.add_argument("--patch", required=True, help="Path to patch file")
+
+    # Step 1: Repo search command
+    repo_parser = subparsers.add_parser("repo", help="Repository awareness commands")
+    repo_subparsers = repo_parser.add_subparsers(dest="repo_command")
+    search_parser = repo_subparsers.add_parser("search", help="Search the repository")
+    search_parser.add_argument("query", help="Search query")
+    search_parser.add_argument("--path", default=".", help="Root path to search")
+
+    # Step 2: Context get command
+    context_parser = subparsers.add_parser("context", help="Deterministic context retrieval")
+    context_subparsers = context_parser.add_subparsers(dest="context_command")
+    get_parser = context_subparsers.add_parser("get", help="Retrieve exact code context")
+    get_parser.add_argument("path_spec", help="File path and line range (path:start-end)")
 
     args = parser.parse_args()
 
@@ -82,6 +95,28 @@ def main():
         else:
             ledger_parser.print_help()
             return
+
+    if args.command == "repo" and args.repo_command == "search":
+        from lathe.repo import search_repo
+        results = search_repo(args.query, args.path)
+        if not results:
+            print("No matches found.")
+        else:
+            for res in results:
+                print(f"{res['path']}:{res['line']} | {res['snippet']}")
+        return
+
+    if args.command == "context" and args.context_command == "get":
+        from lathe.context import get_file_context
+        try:
+            result = get_file_context(args.path_spec)
+            print(f"--- File: {result['path']} ---")
+            print(f"--- Hash: {result['hash']} ---")
+            for line_num, content in result['lines']:
+                print(f"{line_num:4} | {content}")
+        except Exception as e:
+            print(f"Error: {e}")
+        return
 
     if args.command == "exec":
         from lathe.exec import run_safe_command, validate_why_input

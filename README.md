@@ -62,6 +62,12 @@ python -m lathe exec --why why.json -- ls
 # Apply: Controlled patch application (requires a WHY record)
 # Automatically updates the folder ledger with the outcome.
 python -m lathe apply --why why.json --patch fix.patch
+
+# Repo: Search the repository for keywords or file names
+python -m lathe repo search "bootstrap"
+
+# Context: Retrieve exact code context with line numbers and hash
+python -m lathe context get lathe/main.py:1-20
 ```
 
 ## Folder Context Ledger
@@ -71,6 +77,14 @@ Lathe uses `.lathe.md` files for persistent folder-level memory. Use `lathe ledg
 ## Safe Execution
 
 The `exec` command provides controlled execution with an allowlist of tools and protection against destructive commands. Every execution requires a valid WHY record and is logged to the nearest folder ledger.
+
+## Repo Awareness
+
+The `repo search` command provides deterministic, database-free search across the repository, respecting `.gitignore` and skipping binary files.
+
+## Deterministic Context
+
+The `context get` command retrieves specific line ranges from files, providing line numbers and a SHA-256 hash for verification. This ensures evidence retrieval is reproducible and auditable.
 
 ## Patch System
 
