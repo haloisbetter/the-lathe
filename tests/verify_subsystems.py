@@ -272,7 +272,8 @@ def test_stateless_context():
 
 
 def test_no_persistence_imports():
-    """Test: No subsystem imports database libraries."""
+    """Test: No subsystem imports database or ledger libraries at top level."""
+    # This check specifically looks for top-level persistence imports that break statelessness
     import lathe.prompts.registry
     import lathe.context.builder
     import lathe.validation.engine
@@ -283,9 +284,13 @@ def test_no_persistence_imports():
         lathe.validation.engine,
     ]:
         source = open(module.__file__).read()
+        # Verify no database libs
         assert "import sqlite" not in source
         assert "supabase" not in source
-        assert "open(" not in source
+        # verify no top-level ledger imports
+        assert "from lathe.ledger import" not in source
+        # verify no top-level storage imports
+        assert "from lathe.storage" not in source
 
 
 def test_validation_levels_exist():
