@@ -41,18 +41,23 @@ def main():
     why_subparsers = why_parser.add_subparsers(dest="why_command")
     why_subparsers.add_parser("example", help="Print a sample WHY record")
 
-    # Step 1: Ledger command
+    # Ledger command
     ledger_parser = subparsers.add_parser("ledger", help="Folder context ledger system")
     ledger_subparsers = ledger_parser.add_subparsers(dest="ledger_command")
     ledger_show = ledger_subparsers.add_parser("show", help="Show the resolved ledger content")
     ledger_show.add_argument("path", nargs="?", default=".", help="Path to check for ledger")
 
-    # Step 2: Exec command
+    # Exec command
     exec_parser = subparsers.add_parser("exec", help="Safe command runner")
     exec_parser.add_argument("--cwd", default=".", help="Working directory")
     exec_parser.add_argument("--why", required=True, help="Path to WHY JSON file or inline JSON string")
     exec_parser.add_argument("--timeout", type=int, default=60, help="Execution timeout in seconds")
     exec_parser.add_argument("cmd_args", nargs=argparse.REMAINDER, help="Command and arguments")
+
+    # Step 2: Apply command
+    apply_parser = subparsers.add_parser("apply", help="Controlled patch application system")
+    apply_parser.add_argument("--why", required=True, help="Path to WHY JSON file or inline JSON string")
+    apply_parser.add_argument("--patch", required=True, help="Path to patch file")
 
     args = parser.parse_args()
 
@@ -71,7 +76,6 @@ def main():
     if args.command == "ledger":
         from lathe.ledger import read_ledger, ensure_ledger
         if args.ledger_command == "show":
-            # Ensure it exists or just read the nearest
             ensure_ledger(args.path)
             print(read_ledger(args.path))
             return
@@ -81,7 +85,8 @@ def main():
 
     if args.command == "exec":
         from lathe.exec import run_safe_command, validate_why_input
-        # Remove '--' if present in cmd_args (argparse.REMAINDER might include it)
+        from lathe.ledger import append_recent_work, append_failed_attempt
+        
         actual_cmd = args.cmd_args
         if actual_cmd and actual_cmd[0] == '--':
             actual_cmd = actual_cmd[1:]
@@ -91,14 +96,27 @@ def main():
             sys.exit(1)
 
         try:
-            validate_why_input(args.why)
+            why_data = validate_why_input(args.why)
         except Exception as e:
             print(f"WHY Validation Failed: {e}")
             sys.exit(1)
 
         result = run_safe_command(args.cwd, actual_cmd, timeout=args.timeout)
+        
+        # Auto-update ledger
+        cmd_str = " ".join(actual_cmd)
+        summary = f"Executed command: {cmd_str}"
+        res_str = f"Exit code {result.exit_code}"
+        if result.timeout_flag:
+            res_str += " (Timed out)"
+            
+        if result.exit_code == 0:
+            append_recent_work(args.cwd, summary, why_data.get("goal", ""), cmd_str, res_str)
+        else:
+            append_failed_attempt(args.cwd, summary, why_data.get("goal", ""), cmd_str, res_str)
+
         print("--- Execution Report ---")
-        print(f"Command: {' '.join(actual_cmd)}")
+        print(f"Command: {cmd_str}")
         print(f"CWD: {Path(args.cwd).resolve()}")
         print(f"Exit Code: {result.exit_code}")
         print(f"Timeout: {result.timeout_flag}")
@@ -106,6 +124,46 @@ def main():
         print(result.stdout)
         print("\nSTDERR:")
         print(result.stderr)
+        return
+
+    if args.command == "apply":
+        from lathe.exec import validate_why_input
+        from lathe.patch import validate_patch, apply_patch
+        
+        try:
+            why_data = validate_why_input(args.why)
+        except Exception as e:
+            print(f"WHY Validation Failed: {e}")
+            sys.exit(1)
+            
+        patch_path = Path(args.patch)
+        if not patch_path.exists():
+            print(f"Error: Patch file not found: {args.patch}")
+            sys.exit(1)
+            
+        patch_content = patch_path.read_text()
+        try:
+            target_files = validate_patch(patch_content)
+        except Exception as e:
+            print(f"Patch Validation Failed: {e}")
+            sys.exit(1)
+            
+        print("--- Patch Preview ---")
+        print(patch_content)
+        print("\nTarget Files:")
+        for f in target_files:
+            print(f"  - {f}")
+            
+        confirm = input("\nApply this patch? (y/N): ")
+        if confirm.lower() != 'y':
+            print("Aborted.")
+            sys.exit(0)
+            
+        success, output = apply_patch(patch_path, why_data)
+        print("\n--- Patch Result ---")
+        print("Success:", success)
+        print("Output:")
+        print(output)
         return
 
     orchestrator, db, logger = bootstrap()

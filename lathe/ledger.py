@@ -1,5 +1,6 @@
 import os
 from pathlib import Path
+from datetime import datetime
 
 LEDGER_FILENAME = ".lathe.md"
 
@@ -55,3 +56,52 @@ def read_ledger(path: str) -> str:
     if ledger_path.exists():
         return ledger_path.read_text()
     return "No ledger found."
+
+def _append_to_section(ledger_path: Path, section_name: str, entry: str):
+    """Internal helper to append an entry to a specific markdown section."""
+    if not ledger_path.exists():
+        ensure_ledger(str(ledger_path.parent))
+    
+    content = ledger_path.read_text()
+    lines = content.splitlines()
+    
+    target_header = f"# {section_name}"
+    section_index = -1
+    for i, line in enumerate(lines):
+        if line.strip() == target_header:
+            section_index = i
+            break
+    
+    if section_index == -1:
+        # Section missing, append it at the end
+        lines.append(f"\n# {section_name}")
+        lines.append(entry)
+    else:
+        # Find the end of the section (next header or end of file)
+        insert_index = len(lines)
+        for i in range(section_index + 1, len(lines)):
+            if lines[i].startswith("# "):
+                insert_index = i
+                break
+        
+        # Backtrack to find last non-empty line before next section
+        while insert_index > section_index + 1 and not lines[insert_index-1].strip():
+            insert_index -= 1
+            
+        lines.insert(insert_index, entry)
+        
+    ledger_path.write_text("\n".join(lines) + "\n")
+
+def append_recent_work(path: str, action_summary: str, why_goal: str, command: str, result: str):
+    """Append a success entry to 'Recent Work'."""
+    ledger_path = find_ledger(path)
+    timestamp = datetime.now().isoformat(sep=' ', timespec='seconds')
+    entry = f"- [{timestamp}] {action_summary}\n  - Goal: {why_goal}\n  - Command: `{command}`\n  - Result: {result}"
+    _append_to_section(ledger_path, "Recent Work", entry)
+
+def append_failed_attempt(path: str, action_summary: str, why_goal: str, command: str, result: str):
+    """Append a failure entry to 'Failed Attempts'."""
+    ledger_path = find_ledger(path)
+    timestamp = datetime.now().isoformat(sep=' ', timespec='seconds')
+    entry = f"- [{timestamp}] {action_summary}\n  - Goal: {why_goal}\n  - Command: `{command}`\n  - Result: {result}"
+    _append_to_section(ledger_path, "Failed Attempts", entry)

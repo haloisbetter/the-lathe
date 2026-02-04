@@ -56,16 +56,25 @@ python -m lathe why example
 python -m lathe ledger show <path>
 
 # Exec: Safe command execution (requires a WHY record)
-python -m lathe exec --why '{"goal":"test","context":"...","evidence":"...","options_considered":[],"decision":"...","risk_level":"low","guardrails":[],"verification_steps":[]}' -- ls
+# Automatically updates the folder ledger with the outcome.
+python -m lathe exec --why why.json -- ls
+
+# Apply: Controlled patch application (requires a WHY record)
+# Automatically updates the folder ledger with the outcome.
+python -m lathe apply --why why.json --patch fix.patch
 ```
 
 ## Folder Context Ledger
 
-Lathe uses `.lathe.md` files for persistent folder-level memory. Use `lathe ledger show` to resolve and view the context for any path.
+Lathe uses `.lathe.md` files for persistent folder-level memory. Use `lathe ledger show` to resolve and view the context for any path. Successful and failed `exec` and `apply` operations are automatically appended to the ledger.
 
 ## Safe Execution
 
-The `exec` command provides controlled execution with an allowlist of tools and protection against destructive commands. Every execution requires a valid WHY record.
+The `exec` command provides controlled execution with an allowlist of tools and protection against destructive commands. Every execution requires a valid WHY record and is logged to the nearest folder ledger.
+
+## Patch System
+
+The `apply` command allows applying unified diff patches to the codebase. It requires a WHY record, provides a preview, and asks for user confirmation before proceeding.
 
 ## WHY Engine
 
