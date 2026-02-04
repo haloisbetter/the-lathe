@@ -1,0 +1,30 @@
+modules = ["python-3.11", "bash"]
+[agent]
+expertMode = true
+
+[nix]
+channel = "stable-25_05"
+packages = ["libyaml"]
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Lathe CLI"
+
+[[workflows.workflow]]
+name = "Lathe CLI"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python -m lathe.main"
+
+[workflows.workflow.metadata]
+outputType = "console"
