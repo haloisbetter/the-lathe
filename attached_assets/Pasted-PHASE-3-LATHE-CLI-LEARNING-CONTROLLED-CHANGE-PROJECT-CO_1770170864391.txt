@@ -1,0 +1,130 @@
+PHASE 3 — LATHE CLI: LEARNING + CONTROLLED CHANGE
+
+PROJECT CONTEXT
+- Python CLI project
+- Python 3.11+
+- No frontend
+- No web server
+- No HTTP APIs
+- CLI entrypoint already normalized
+- WHY engine implemented (lathe/why.py)
+- Folder ledger system implemented (lathe/ledger.py)
+- Safe command execution implemented (lathe/exec.py)
+- lathe.yml is the primary configuration file
+- Existing commands include:
+  init-config, list, show, run, replay, why, ledger show, exec
+
+GLOBAL CONSTRAINTS
+- Do NOT introduce web frameworks.
+- Do NOT introduce async networking.
+- Do NOT integrate LLMs or RAG yet.
+- Use ASCII only.
+- Create full, drop-in files only.
+- Do not refactor unrelated code.
+- If uncertain, STOP and explain assumptions.
+- Do not exceed 10 seconds of reasoning per step.
+- Only complete TWO steps total, then STOP.
+
+OPERATING RULES
+- Produce a short PLAN first (max 6 steps).
+- Mark each step as: safe / risky / destructive.
+- Execute ONLY Step 1 and Step 2.
+- After Step 2, STOP and wait.
+
+GOAL
+Evolve Lathe from “safe executor” into a system that:
+- learns from actions
+- records outcomes automatically
+- applies controlled code changes
+while remaining auditable and CLI-first.
+
+-------------------------------------------------
+STEP 1 (safe): Auto-Update Folder Context Ledger
+-------------------------------------------------
+
+Objectives:
+- Ensure Lathe never forgets what it has done.
+- Turn execution + WHY into persistent folder memory.
+
+Actions:
+- Extend lathe/ledger.py to support controlled updates.
+- Implement functions to append entries to `.lathe.md`:
+  - append_recent_work(...)
+  - append_failed_attempt(...)
+- Define rules:
+  - Ledger updates ONLY occur after:
+    - a validated WHY record
+    - a completed exec result
+  - Successful executions update:
+    - "Recent Work"
+  - Failed executions update:
+    - "Failed Attempts"
+- Each ledger entry must include:
+  - timestamp
+  - summary of action
+  - WHY goal
+  - command executed
+  - verification result (exit code / timeout)
+- Modify lathe exec command to:
+  - resolve nearest ledger
+  - update ledger automatically after execution
+- Do NOT overwrite existing ledger content.
+- Do NOT require user interaction for updates.
+
+Deliverables:
+- Updated lathe/ledger.py (complete)
+- Updated lathe/exec.py (complete)
+- README.md updated to explain auto-ledger behavior
+
+-------------------------------------------------
+STEP 2 (risky): Controlled Patch Application System
+-------------------------------------------------
+
+Objectives:
+- Allow Lathe to change code in a reversible, inspectable way.
+- Preserve trust and auditability.
+
+Actions:
+- Create a new module:
+  - lathe/patch.py
+- Implement patch application using unified diffs:
+  - Accept patch text via file or stdin
+  - Validate patch format
+  - Validate target files exist
+  - Enforce:
+    - max files per patch (default: 5)
+    - no binary files
+- Add a CLI command:
+  - `lathe apply --why <why_input> --patch <patch_file>`
+- Require:
+  - Valid WHY record (use lathe/why.py)
+  - User confirmation before applying
+- Before applying:
+  - Print a diff preview
+- After applying:
+  - Update the folder ledger:
+    - "Recent Work" on success
+    - "Failed Attempts" on failure
+- Explicitly DO NOT:
+  - auto-generate patches
+  - auto-fix code
+  - run tests automatically
+  - retry on failure
+
+Deliverables:
+- lathe/patch.py (complete)
+- CLI command wired into lathe/cli
+- README.md updated with patch workflow
+
+-------------------------------------------------
+STOP
+-------------------------------------------------
+
+After completing Step 2:
+- STOP execution.
+- Do NOT continue to:
+  - RAG
+  - model usage
+  - auto-patching loops
+  - OpenWebUI integration
+- Wait for the next instruction.
