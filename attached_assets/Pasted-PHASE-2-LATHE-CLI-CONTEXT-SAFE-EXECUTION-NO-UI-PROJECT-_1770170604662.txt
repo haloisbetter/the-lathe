@@ -1,0 +1,134 @@
+PHASE 2 — LATHE CLI: CONTEXT + SAFE EXECUTION (NO UI)
+
+PROJECT CONTEXT
+- This is a Python CLI project.
+- Python 3.11+
+- No frontend.
+- No web server.
+- CLI entrypoint already normalized.
+- WHY engine already implemented in lathe/why.py.
+- lathe.yml exists and is the primary configuration file.
+- Commands already exist: init-config, list, show, run, replay, why.
+
+GLOBAL CONSTRAINTS
+- Do NOT introduce web frameworks.
+- Do NOT introduce FastAPI or HTTP servers.
+- Do NOT add async networking.
+- Use ASCII only.
+- Create complete, drop-in files only.
+- Do not refactor unrelated code.
+- If uncertain, STOP and explain assumptions.
+- Do not exceed 10 seconds of reasoning per step.
+- Only complete TWO steps total, then STOP.
+
+OPERATING RULES
+- Produce a short PLAN first (max 6 steps).
+- Mark each step as: safe / risky / destructive.
+- Execute ONLY Step 1 and Step 2.
+- After Step 2, STOP and wait.
+
+GOAL
+Advance Lathe from "explainable CLI" to "stateful, disciplined CLI"
+by introducing:
+- folder-level context memory
+- safe, observable command execution
+WITHOUT yet adding RAG or model integration.
+
+-------------------------------------------------
+STEP 1 (safe): Folder Context Ledger System
+-------------------------------------------------
+
+Objectives:
+- Give Lathe persistent memory at the folder level.
+- Prevent repeated mistakes.
+- Keep the agent (and human) aligned over time.
+
+Actions:
+- Introduce a folder context system:
+  - Per-folder markdown file named `.lathe.md`
+  - Agent-owned, human-readable
+- Create a new module:
+  - lathe/ledger.py
+- Implement logic to:
+  - Detect the nearest `.lathe.md` when operating on a path
+  - Create `.lathe.md` if missing
+  - Read existing context before actions
+- Define a strict `.lathe.md` format with sections:
+  - Purpose
+  - Known Invariants
+  - Recent Work
+  - Failed Attempts
+  - Open Questions
+  - Agent Notes
+- Add a new CLI command:
+  - `lathe ledger show <path>`
+  - Prints the resolved ledger content
+- Do NOT auto-write yet except on creation.
+- Do NOT integrate with WHY yet.
+
+Deliverables:
+- lathe/ledger.py (complete)
+- CLI command wired into lathe/cli
+- README.md updated to explain ledgers
+
+-------------------------------------------------
+STEP 2 (safe): Safe Command Runner (Execution Core v0)
+-------------------------------------------------
+
+Objectives:
+- Introduce controlled command execution.
+- Produce observable results.
+- Lay groundwork for agent autonomy.
+
+Actions:
+- Create a new module:
+  - lathe/exec.py
+- Implement a safe command runner that:
+  - Accepts:
+    - working directory
+    - command (list form)
+    - timeout
+  - Enforces:
+    - working directory must exist
+    - execution stays within that directory
+    - command allowlist:
+      python, python3, pytest, node, npm, pnpm, yarn,
+      ruff, black, mypy, eslint, tsc, go, cargo, make
+    - denylist substrings:
+      sudo, rm , del , format, diskpart, reg 
+  - Captures:
+    - stdout
+    - stderr
+    - exit code
+    - timeout flag
+- Add a CLI command:
+  - `lathe exec --cwd <path> -- <command>`
+- Require a WHY record reference:
+  - Accept a WHY JSON file path or inline WHY payload
+  - Validate using lathe/why.py
+- Print a structured execution report to stdout.
+
+Explicitly DO NOT:
+- Modify files
+- Auto-fix errors
+- Loop or retry
+- Integrate RAG
+- Integrate models
+
+Deliverables:
+- lathe/exec.py (complete)
+- CLI command wired in
+- README.md updated with exec usage
+
+-------------------------------------------------
+STOP
+-------------------------------------------------
+
+After completing Step 2:
+- STOP execution.
+- Do NOT continue to:
+  - RAG
+  - model usage
+  - auto-writing ledgers
+  - patch application
+- Wait for the next instruction.

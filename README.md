@@ -51,7 +51,21 @@ python -m lathe replay <task_id>
 
 # WHY Engine: Print a sample WHY record
 python -m lathe why example
+
+# Ledger: Show folder context memory
+python -m lathe ledger show <path>
+
+# Exec: Safe command execution (requires a WHY record)
+python -m lathe exec --why '{"goal":"test","context":"...","evidence":"...","options_considered":[],"decision":"...","risk_level":"low","guardrails":[],"verification_steps":[]}' -- ls
 ```
+
+## Folder Context Ledger
+
+Lathe uses `.lathe.md` files for persistent folder-level memory. Use `lathe ledger show` to resolve and view the context for any path.
+
+## Safe Execution
+
+The `exec` command provides controlled execution with an allowlist of tools and protection against destructive commands. Every execution requires a valid WHY record.
 
 ## WHY Engine
 
