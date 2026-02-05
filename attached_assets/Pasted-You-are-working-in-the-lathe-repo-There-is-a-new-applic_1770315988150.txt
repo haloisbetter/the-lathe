@@ -1,0 +1,58 @@
+You are working in the-lathe repo. There is a new application layer under lathe_app/ that provides:
+- run_request(...)
+- execute_proposal(run_id, dry_run=True|False)
+- list_runs()
+- load_run(run_id)
+
+Goal: expose the *application layer* via a thin HTTP server so OpenWebUI can:
+1) create runs (propose/think/context/rag)
+2) execute a proposal run explicitly
+
+Constraints:
+- Do NOT modify any lathe/* kernel behavior.
+- Keep lathe_app as the only place state + side effects exist.
+- HTTP server must be standard library only (like existing lathe/server.py).
+- Responses must be JSON only and follow the existing refusal semantics:
+  refusal: true (boolean), reason, details, results (always array).
+- Success responses must always include results: [] even if unused.
+- Server must never return tracebacks.
+
+Deliverables:
+1) Add new server file: lathe_app/server.py (or lathe/server_app.py) that exposes:
+   - POST /agent
+     Request body: { intent, task, why, model? }
+     Behavior: calls lathe_app.run_request(...)
+     Response: RunRecord serialized to JSON plus "results": []
+   - POST /execute
+     Request body: { run_id, dry_run? }
+     Behavior: calls lathe_app.execute_proposal(...)
+     Response: ExecutionResult serialized to JSON plus "results": []
+   - GET /health returning JSON { "ok": true }
+   - GET /runs returning list_runs() output
+   - GET /runs/<id> returning load_run(id)
+
+2) Add a small serializer module if needed:
+   lathe_app/http_serialization.py:
+   - to_jsonable_runrecord(...)
+   - to_jsonable_execution_result(...)
+   Ensure dataclasses and Path objects serialize cleanly.
+
+3) Add tests:
+   tests/app/test_http_app_server.py that verifies:
+   - POST /agent returns run_id and does NOT apply changes
+   - POST /execute with dry_run=true does not mutate fixtures
+   - POST /execute with dry_run=false attempts apply (use temp dir fixture)
+   - missing fields return structured refusal
+   - GET /health returns ok
+   - no tracebacks are returned
+
+4) Provide a minimal OpenWebUI tool JSON definitions in a comment at top of server file:
+   Tool 1: lathe_agent calls POST /agent
+   Tool 2: lathe_execute calls POST /execute
+
+Acceptance:
+- pytest -q passes (must increase test count appropriately).
+- Server runs and responds on port 5000 or 5001.
+- Tool responses are stable and strictly JSON.
+
+Proceed to implement with minimal changes and maximum determinism.
