@@ -1,0 +1,89 @@
+You are continuing work inside the repository: the-lathe
+
+GOAL
+Introduce Workspace Isolation so each Lathe run operates within a well-defined project boundary.
+
+HARD CONSTRAINTS
+• DO NOT modify lathe/ kernel
+• DO NOT change execution semantics
+• DO NOT auto-apply changes
+• All isolation lives in lathe_app/
+• Existing APIs must remain backward compatible
+• All existing tests must continue to pass
+
+ARCHITECTURAL INTENT
+Lathe reasons globally.
+The app scopes locally.
+Executors act only inside workspaces.
+
+IMPLEMENTATION REQUIREMENTS
+
+1) New package:
+lathe_app/workspace/
+
+Files to create:
+
+lathe_app/workspace/models.py
+- Dataclass: Workspace
+  • id
+  • root_path
+  • created_at
+  • active
+
+lathe_app/workspace/manager.py
+- WorkspaceManager with:
+  • create_workspace(path)
+  • list_workspaces()
+  • get_workspace(id)
+  • resolve_path(workspace_id, relative_path)
+- Enforce:
+  • No path traversal
+  • No cross-workspace access
+
+lathe_app/workspace/context.py
+- Context object injected into orchestrator
+- Carries:
+  • workspace_id
+  • root_path
+- Defaults to current repo if not provided
+
+2) Orchestrator Integration
+- Update lathe_app/orchestrator.py
+- run_request() accepts optional workspace_id
+- All file inspection and execution must be scoped
+- No workspace → default workspace
+
+3) Executor Hardening
+- Update lathe_app/executor.py
+- Executor must:
+  • Refuse execution outside workspace root
+  • Record workspace_id in ExecutionResult
+- Dry-run remains default
+
+4) OpenWebUI Tools
+Add schemas (do not auto-register):
+• lathe_workspace_create
+• lathe_workspace_list
+
+Endpoints:
+POST /workspace/create
+GET  /workspace/list
+
+5) Tests
+Create tests under:
+tests/app/workspace/
+
+Required tests:
+• Path traversal rejection
+• Workspace isolation enforcement
+• Execution blocked outside workspace
+• Backward compatibility (no workspace specified)
+
+6) Guarantees
+• No workspace data leaks into kernel
+• No implicit workspace switching
+• Workspace isolation does NOT change Lathe reasoning
+• Violations return structured refusal
+
+DELIVERABLE
+A workspace isolation system that allows multiple projects to coexist safely while preserving Lathe’s determinism and security model.
