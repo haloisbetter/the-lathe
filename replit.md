@@ -52,10 +52,25 @@ python -m lathe_app.server
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/health` | GET | Health check |
-| `/runs` | GET | List all run IDs |
+| `/runs` | GET | Search runs (query params: intent, outcome, file, since, until, limit) |
 | `/runs/<id>` | GET | Load a specific run |
+| `/runs/<id>/review` | GET | Get review state for a run |
 | `/agent` | POST | Create a run (propose/think/rag/plan) |
-| `/execute` | POST | Execute a proposal |
+| `/execute` | POST | Execute an approved proposal |
+| `/review` | POST | Review/approve/reject a proposal |
+| `/fs/tree` | GET | Directory tree (query: path, max_depth) |
+| `/fs/status` | GET | Git status |
+| `/fs/diff` | GET | Git diff (query: staged) |
+| `/fs/run/<id>/files` | GET | Files touched by a run |
+
+### OpenWebUI Tools
+
+Five tool schemas are defined in server.py:
+- `lathe_agent`: Create a new run
+- `lathe_execute`: Execute an approved proposal
+- `lathe_runs`: Search run history
+- `lathe_review`: Review/approve/reject proposals
+- `lathe_fs`: Read-only filesystem inspection
 
 ### POST /agent
 ```json
