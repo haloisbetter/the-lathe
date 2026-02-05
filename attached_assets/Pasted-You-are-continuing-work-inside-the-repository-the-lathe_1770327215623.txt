@@ -1,0 +1,94 @@
+You are continuing work inside the repository: the-lathe
+
+GOAL
+Add a first-class Knowledge Ingestion system to the app layer so Lathe can reason over user-provided documentation safely and deterministically.
+
+HARD CONSTRAINTS
+• DO NOT modify anything inside lathe/
+• DO NOT weaken existing guardrails, validation, or fallback logic
+• All ingestion must live in lathe_app/
+• Knowledge ingestion must be optional
+• Determinism must be preserved
+• All existing tests must continue to pass
+
+ARCHITECTURAL INTENT
+Lathe reasons.
+The app learns.
+RAG consumes read-only knowledge.
+No execution paths depend on ingestion success.
+
+IMPLEMENTATION REQUIREMENTS
+
+1) New package:
+lathe_app/knowledge/
+
+Files to create:
+
+lathe_app/knowledge/ingest.py
+- Accept files or directories
+- Supported formats: .md, .txt, .py, .json
+- Reject binaries and unsafe paths
+- Normalize content to plain text
+- Chunk deterministically (fixed size + overlap)
+- Return Chunk objects (data only)
+
+lathe_app/knowledge/index.py
+- In-memory vector index (no external deps)
+- Deterministic embedding stub (hash-based for now)
+- Functions:
+  • build_index(chunks)
+  • query_index(query, k)
+- Index must be rebuildable and discardable
+
+lathe_app/knowledge/status.py
+- Track:
+  • number of documents
+  • number of chunks
+  • last indexed timestamp
+- No persistence required yet
+
+lathe_app/knowledge/models.py
+- Dataclasses:
+  • Document
+  • Chunk
+  • KnowledgeIndexStatus
+
+2) RAG Integration (App Layer Only)
+- Extend lathe_app/orchestrator.py
+- If intent == rag:
+  • Query knowledge index
+  • Return matched chunks as evidence
+- Kernel RAG remains untouched
+
+3) OpenWebUI Tool
+Add a new tool schema (do not register automatically):
+lathe_knowledge_ingest
+
+Endpoint:
+POST /knowledge/ingest
+
+Payload:
+{
+  "path": "docs/",
+  "rebuild": false
+}
+
+4) Tests
+Create tests under:
+tests/app/knowledge/
+
+Required tests:
+• Deterministic chunking
+• Unsafe path rejection
+• Rebuild vs incremental ingest
+• RAG returns same chunks for same query
+• Kernel untouched (import checks)
+
+5) Guarantees
+• Knowledge ingestion failure must NEVER block Lathe
+• Missing index → empty RAG result, not refusal
+• No embeddings stored in lathe/
+• No execution logic added
+
+DELIVERABLE
+A functioning knowledge ingestion system that allows Lathe to reason over user docs without compromising determinism or safety.
