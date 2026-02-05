@@ -165,6 +165,29 @@
         "url": "http://HOST:3001/fs/tree",
         "note": "Use /fs/tree for tree, /fs/status for status, /fs/diff for diff"
       }
+    },
+    {
+      "name": "lathe_knowledge_ingest",
+      "description": "Ingest documentation into the knowledge index for RAG. Supports .md, .txt, .py, .json files. Unsafe paths (system directories) are rejected.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to file or directory to ingest (relative paths only)"
+          },
+          "rebuild": {
+            "type": "boolean",
+            "default": false,
+            "description": "If true, clear existing index before ingesting. Default: false (incremental)."
+          }
+        },
+        "required": ["path"]
+      },
+      "endpoint": {
+        "method": "POST",
+        "url": "http://HOST:3001/knowledge/ingest"
+      }
     }
   ],
   "port_configuration": {

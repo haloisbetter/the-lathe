@@ -4,8 +4,13 @@ Lathe App Orchestrator
 The workflow loop that drives Lathe.
 Stateless - all state is in the artifacts returned.
 Storage is optional and injected.
+
+RAG Enhancement:
+- If intent == rag, queries knowledge index for evidence
+- Missing index returns empty results (not error)
+- Kernel RAG remains untouched
 """
-from typing import Any, Callable, Dict, Optional
+from typing import Any, Callable, Dict, List, Optional
 
 from lathe.pipeline import process_request, PipelineResult
 from lathe.model_tiers import FALLBACK_MODEL
@@ -18,6 +23,33 @@ from lathe_app.artifacts import (
     PlanArtifact,
 )
 from lathe_app.storage import Storage
+
+
+def query_knowledge_index(query: str, k: int = 5) -> List[Dict[str, Any]]:
+    """
+    Query the knowledge index for relevant chunks.
+    
+    Returns empty list if index is not available (never fails).
+    """
+    try:
+        from lathe_app.knowledge.index import get_default_index
+        index = get_default_index()
+        
+        if index.is_empty:
+            return []
+        
+        results = index.query(query, k=k)
+        return [
+            {
+                "chunk_id": chunk.id,
+                "document_id": chunk.document_id,
+                "content": chunk.content,
+                "similarity": round(score, 4),
+            }
+            for chunk, score in results
+        ]
+    except Exception:
+        return []
 
 
 def _default_agent_fn(normalized, model_id: str) -> str:

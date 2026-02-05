@@ -99,6 +99,8 @@ Endpoints:
   GET  /fs/status  - Git status (read-only)
   GET  /fs/diff    - Git diff (read-only)
   GET  /fs/run/<id>/files - Files touched by run
+  GET  /knowledge/status - Knowledge index status
+  POST /knowledge/ingest - Ingest documents into knowledge index
 """
 import json
 import logging
@@ -193,6 +195,8 @@ class AppHandler(BaseHTTPRequestHandler):
                 run_id = path.split("/")[3]
                 files = lathe_app.fs_run_files(run_id)
                 self.send_json({"run_id": run_id, "files": files, "results": []})
+            elif path == "/knowledge/status":
+                self.handle_knowledge_status()
             else:
                 self.send_json(make_refusal("not_found", f"Unknown path: {path}"), 404)
         except Exception as e:
@@ -216,6 +220,8 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.handle_execute(body)
             elif path == "/review":
                 self.handle_review(body)
+            elif path == "/knowledge/ingest":
+                self.handle_knowledge_ingest(body)
             else:
                 self.send_json(make_refusal("not_found", f"Unknown path: {path}"), 404)
         except Exception as e:
@@ -336,6 +342,54 @@ class AppHandler(BaseHTTPRequestHandler):
         
         result = lathe_app.fs_tree(path, max_depth=max_depth)
         self.send_json(result.to_dict())
+    
+    def handle_knowledge_status(self):
+        """Handle GET /knowledge/status - get knowledge index status."""
+        try:
+            from lathe_app.knowledge import get_status
+            status = get_status()
+            response = status.to_dict()
+            response["results"] = []
+            self.send_json(response)
+        except Exception as e:
+            self.send_json(make_refusal("knowledge_error", str(e)))
+    
+    def handle_knowledge_ingest(self, body: Dict[str, Any]):
+        """Handle POST /knowledge/ingest - ingest documents into knowledge index."""
+        path = body.get("path")
+        rebuild = body.get("rebuild", False)
+        
+        if not path:
+            self.send_json(make_refusal("missing_fields", "Missing required field: path"), 400)
+            return
+        
+        try:
+            from lathe_app.knowledge import ingest_path, get_default_index, get_status
+            
+            index = get_default_index()
+            
+            if rebuild:
+                index.clear()
+            
+            documents, chunks, errors = ingest_path(path)
+            
+            for doc in documents:
+                index.add_document(doc)
+            for chunk in chunks:
+                index.add_chunk(chunk)
+            
+            status = get_status()
+            
+            response = {
+                "ingested_documents": len(documents),
+                "ingested_chunks": len(chunks),
+                "errors": errors,
+                "index_status": status.to_dict(),
+                "results": [],
+            }
+            self.send_json(response)
+        except Exception as e:
+            self.send_json(make_refusal("ingestion_error", str(e)))
 
 
 DEFAULT_PORT = 3001
