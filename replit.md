@@ -30,9 +30,14 @@ lathe_app/          # Application layer (all state lives here)
 ├── storage.py      # Pluggable persistence (InMemoryStorage, NullStorage)
 ├── executor.py     # PatchExecutor for applying proposals
 ├── http_serialization.py  # JSON serialization
-└── server.py       # HTTP server for OpenWebUI
+├── server.py       # HTTP server for OpenWebUI
+└── knowledge/      # Knowledge ingestion for RAG
+    ├── models.py   # Document, Chunk, KnowledgeIndexStatus
+    ├── ingest.py   # File ingestion with chunking
+    ├── index.py    # In-memory vector index
+    └── status.py   # Index status tracking
 
-tests/              # 167 tests
+tests/              # 266 tests
 ├── test_*.py       # Core Lathe tests
 └── app/            # App layer tests
 ```
@@ -69,15 +74,18 @@ python -m lathe.server
 | `/fs/status` | GET | Git status |
 | `/fs/diff` | GET | Git diff (query: staged) |
 | `/fs/run/<id>/files` | GET | Files touched by a run |
+| `/knowledge/status` | GET | Knowledge index status |
+| `/knowledge/ingest` | POST | Ingest documents for RAG |
 
 ### OpenWebUI Tools
 
-Five tool schemas are defined in server.py:
+Six tool schemas are defined in server.py:
 - `lathe_agent`: Create a new run
 - `lathe_execute`: Execute an approved proposal
 - `lathe_runs`: Search run history
 - `lathe_review`: Review/approve/reject proposals
 - `lathe_fs`: Read-only filesystem inspection
+- `lathe_knowledge_ingest`: Ingest documents into knowledge index for RAG
 
 See `openwebui_tools.json` for complete tool schemas with parameter definitions.
 
@@ -90,6 +98,17 @@ See `openwebui_tools.json` for complete tool schemas with parameter definitions.
 ```json
 {"run_id": "run-123", "dry_run": true}
 ```
+
+### POST /knowledge/ingest
+```json
+{"path": "docs/", "rebuild": false}
+```
+
+Response includes `ingested_documents`, `ingested_chunks`, `errors`, and `index_status`.
+
+**Supported formats:** .md, .txt, .py, .json
+
+**Path safety:** Rejects system directories (/etc, /var, etc.) and path traversals.
 
 ## Python API (lathe_app)
 
