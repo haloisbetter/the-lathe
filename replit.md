@@ -43,8 +43,15 @@ tests/              # 167 tests
 # CLI interface
 python -m lathe.main
 
-# App HTTP server (port 3000)
+# App HTTP server (port 3001, configurable)
 python -m lathe_app.server
+
+# App with custom port
+python -m lathe_app.server --port 4000
+LATHE_APP_PORT=4000 python -m lathe_app.server
+
+# Kernel server (port 5000, direct access)
+python -m lathe.server
 ```
 
 ## HTTP API (lathe_app.server)
@@ -71,6 +78,8 @@ Five tool schemas are defined in server.py:
 - `lathe_runs`: Search run history
 - `lathe_review`: Review/approve/reject proposals
 - `lathe_fs`: Read-only filesystem inspection
+
+See `openwebui_tools.json` for complete tool schemas with parameter definitions.
 
 ### POST /agent
 ```json
