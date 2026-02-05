@@ -1,0 +1,97 @@
+MASTER PROMPT — LATHE APP PORT FIX + MEMORY CLARIFICATION (LOCK-IN)
+
+You are working in a repository with a strict two-layer architecture:
+
+────────────────────────
+ARCHITECTURAL LAW (NON-NEGOTIABLE)
+────────────────────────
+1. lathe/ is a PURE KERNEL
+   - No state
+   - No filesystem writes
+   - No networking
+   - No ports
+   - Deterministic: same input → same output
+
+2. lathe_app/ is the APPLICATION SHELL
+   - Owns HTTP servers
+   - Owns persistence
+   - Owns execution
+   - Owns ports
+   - Wraps Lathe without modifying it
+
+3. OpenWebUI is ONLY a frontend
+   - Must never share a port with Lathe or lathe_app
+
+────────────────────────
+PROBLEM TO FIX
+────────────────────────
+The lathe_app HTTP server currently uses a port that conflicts with OpenWebUI
+(default 3000). This causes instability and confusion in local setups.
+
+────────────────────────
+REQUIRED CHANGES (DO EXACTLY THIS)
+────────────────────────
+A. PORT HARDENING
+1. Change the default port used by lathe_app/server.py
+   - New default port: 3001
+2. Port must be configurable via:
+   - Environment variable: LATHE_APP_PORT
+   - CLI flag: --port
+3. Resolution order (highest → lowest priority):
+   - CLI flag
+   - Environment variable
+   - Default = 3001
+4. OpenWebUI is assumed to run on 3000 and must not be modified.
+
+B. TEST COVERAGE
+1. Add or update tests to verify:
+   - Default port is 3001
+   - LATHE_APP_PORT overrides default
+   - --port flag overrides everything
+2. No test may assume port 3000.
+3. All existing tests must continue to pass.
+
+C. DOCUMENT THE SEPARATION (MINIMAL)
+1. Add concise inline comments stating:
+   - OpenWebUI → 3000
+   - Lathe App → 3001
+2. Do NOT change schemas, APIs, or response formats.
+
+────────────────────────
+MEMORY / HISTORY LOCK-IN (DO NOT CHANGE BEHAVIOR)
+────────────────────────
+The following behavior is INTENTIONAL and MUST remain unchanged:
+
+- lathe/ remembers NOTHING
+- lathe_app/ is responsible for remembering EVERYTHING
+
+Specifically:
+- Run history lives in lathe_app/storage.py
+- Outputs live as immutable artifacts
+- Execution history is explicit and auditable
+- Lathe kernel must remain stateless forever
+
+Do NOT add memory, caching, or persistence to lathe/.
+
+────────────────────────
+ACCEPTANCE CRITERIA
+────────────────────────
+- python -m lathe_app.server → binds to port 3001
+- LATHE_APP_PORT=4000 python -m lathe_app.server → binds to 4000
+- python -m lathe_app.server --port 5000 → binds to 5000
+- All tests pass
+- No behavioral changes to Lathe kernel
+- No OpenWebUI changes required
+
+────────────────────────
+OUTPUT REQUIREMENTS
+────────────────────────
+1. List modified files
+2. List new/updated tests
+3. Confirm all tests pass
+4. Do NOT refactor unrelated code
+5. Do NOT introduce new features
+
+This is a surgical architectural fix.
+Do not be clever.
+Be correct.

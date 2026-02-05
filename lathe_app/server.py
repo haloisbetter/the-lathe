@@ -45,6 +45,7 @@ Endpoints:
 """
 import json
 import logging
+import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Any, Dict, Optional
 from urllib.parse import urlparse
@@ -190,17 +191,44 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json(response)
 
 
-def create_server(host: str = "0.0.0.0", port: int = 3000) -> HTTPServer:
+DEFAULT_PORT = 3001
+
+
+def get_port(cli_port: int = None) -> int:
+    """
+    Resolve port with priority: CLI > env var > default.
+    
+    Port assignments:
+    - OpenWebUI → 3000 (external, not managed here)
+    - Lathe App → 3001 (default)
+    """
+    if cli_port is not None:
+        return cli_port
+    
+    env_port = os.environ.get("LATHE_APP_PORT")
+    if env_port:
+        try:
+            return int(env_port)
+        except ValueError:
+            logger.warning(f"Invalid LATHE_APP_PORT={env_port}, using default")
+    
+    return DEFAULT_PORT
+
+
+def create_server(host: str = "0.0.0.0", port: int = None) -> HTTPServer:
     """Create the HTTP server instance."""
+    if port is None:
+        port = DEFAULT_PORT
     server = HTTPServer((host, port), AppHandler)
     return server
 
 
-def run_server(host: str = "0.0.0.0", port: int = 3000):
+def run_server(host: str = "0.0.0.0", port: int = None):
     """Run the HTTP server."""
-    server = create_server(host, port)
-    logger.info(f"Lathe App Server listening on {host}:{port}")
-    print(f"Lathe App Server listening on {host}:{port}")
+    resolved_port = get_port(port)
+    server = create_server(host, resolved_port)
+    logger.info(f"Lathe App Server listening on {host}:{resolved_port}")
+    print(f"Lathe App Server listening on {host}:{resolved_port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
@@ -208,6 +236,29 @@ def run_server(host: str = "0.0.0.0", port: int = 3000):
         server.shutdown()
 
 
-if __name__ == "__main__":
+def main():
+    """CLI entry point with --port flag support."""
+    import argparse
+    
+    parser = argparse.ArgumentParser(description="Lathe App HTTP Server")
+    parser.add_argument(
+        "--port", "-p",
+        type=int,
+        default=None,
+        help=f"Port to listen on (default: {DEFAULT_PORT}, or LATHE_APP_PORT env var)"
+    )
+    parser.add_argument(
+        "--host",
+        type=str,
+        default="0.0.0.0",
+        help="Host to bind to (default: 0.0.0.0)"
+    )
+    
+    args = parser.parse_args()
+    
     logging.basicConfig(level=logging.INFO)
-    run_server()
+    run_server(host=args.host, port=args.port)
+
+
+if __name__ == "__main__":
+    main()

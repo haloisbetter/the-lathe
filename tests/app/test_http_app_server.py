@@ -8,15 +8,17 @@ Verifies:
 - missing fields return structured refusal
 - GET /health returns ok
 - no tracebacks are returned
+- Port configuration: default=3001, env var, CLI flag
 """
 import json
+import os
 import pytest
 import threading
 import time
 from http.client import HTTPConnection
 from typing import Any, Dict
 
-from lathe_app.server import create_server
+from lathe_app.server import create_server, get_port, DEFAULT_PORT
 import lathe_app
 
 
@@ -248,3 +250,70 @@ class TestErrorHandling:
         response_str = json.dumps(data)
         assert "Traceback" not in response_str
         assert "File \"" not in response_str
+
+
+class TestPortConfiguration:
+    """
+    Tests for port configuration.
+    
+    Port assignments:
+    - OpenWebUI → 3000 (external, not managed here)
+    - Lathe App → 3001 (default)
+    """
+    
+    def test_default_port_is_3001(self):
+        """Default port must be 3001, not 3000 (OpenWebUI uses 3000)."""
+        assert DEFAULT_PORT == 3001
+    
+    def test_get_port_returns_default(self):
+        """get_port() returns 3001 when no overrides."""
+        old_env = os.environ.pop("LATHE_APP_PORT", None)
+        try:
+            assert get_port() == 3001
+        finally:
+            if old_env:
+                os.environ["LATHE_APP_PORT"] = old_env
+    
+    def test_get_port_cli_overrides_all(self):
+        """CLI flag has highest priority."""
+        old_env = os.environ.get("LATHE_APP_PORT")
+        os.environ["LATHE_APP_PORT"] = "4000"
+        try:
+            assert get_port(cli_port=5000) == 5000
+        finally:
+            if old_env:
+                os.environ["LATHE_APP_PORT"] = old_env
+            else:
+                os.environ.pop("LATHE_APP_PORT", None)
+    
+    def test_get_port_env_overrides_default(self):
+        """LATHE_APP_PORT env var overrides default."""
+        old_env = os.environ.get("LATHE_APP_PORT")
+        os.environ["LATHE_APP_PORT"] = "4000"
+        try:
+            assert get_port() == 4000
+        finally:
+            if old_env:
+                os.environ["LATHE_APP_PORT"] = old_env
+            else:
+                os.environ.pop("LATHE_APP_PORT", None)
+    
+    def test_get_port_invalid_env_uses_default(self):
+        """Invalid LATHE_APP_PORT falls back to default."""
+        old_env = os.environ.get("LATHE_APP_PORT")
+        os.environ["LATHE_APP_PORT"] = "not_a_number"
+        try:
+            assert get_port() == 3001
+        finally:
+            if old_env:
+                os.environ["LATHE_APP_PORT"] = old_env
+            else:
+                os.environ.pop("LATHE_APP_PORT", None)
+    
+    def test_create_server_uses_default_port(self):
+        """create_server() defaults to 3001."""
+        server = create_server("127.0.0.1")
+        try:
+            assert server.server_address[1] == 3001
+        finally:
+            server.server_close()
