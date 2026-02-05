@@ -31,13 +31,18 @@ lathe_app/          # Application layer (all state lives here)
 ├── executor.py     # PatchExecutor for applying proposals
 ├── http_serialization.py  # JSON serialization
 ├── server.py       # HTTP server for OpenWebUI
-└── knowledge/      # Knowledge ingestion for RAG
-    ├── models.py   # Document, Chunk, KnowledgeIndexStatus
-    ├── ingest.py   # File ingestion with chunking
-    ├── index.py    # In-memory vector index
+├── knowledge/      # Knowledge ingestion for RAG
+│   ├── models.py   # Document, Chunk, KnowledgeIndexStatus
+│   ├── ingest.py   # File ingestion with chunking
+│   ├── index.py    # In-memory vector index
+│   └── status.py   # Index status tracking
+└── workspace/      # Workspace isolation for multi-project safety
+    ├── models.py   # Workspace dataclass
+    ├── manager.py  # WorkspaceManager with path safety
+    ├── context.py  # WorkspaceContext for scoping
     └── status.py   # Index status tracking
 
-tests/              # 266 tests
+tests/              # 318 tests
 ├── test_*.py       # Core Lathe tests
 └── app/            # App layer tests
 ```
@@ -76,16 +81,20 @@ python -m lathe.server
 | `/fs/run/<id>/files` | GET | Files touched by a run |
 | `/knowledge/status` | GET | Knowledge index status |
 | `/knowledge/ingest` | POST | Ingest documents for RAG |
+| `/workspace/list` | GET | List all workspaces |
+| `/workspace/create` | POST | Create a new workspace |
 
 ### OpenWebUI Tools
 
-Six tool schemas are defined in server.py:
+Eight tool schemas are defined in server.py:
 - `lathe_agent`: Create a new run
 - `lathe_execute`: Execute an approved proposal
 - `lathe_runs`: Search run history
 - `lathe_review`: Review/approve/reject proposals
 - `lathe_fs`: Read-only filesystem inspection
 - `lathe_knowledge_ingest`: Ingest documents into knowledge index for RAG
+- `lathe_workspace_create`: Create a new workspace for project isolation
+- `lathe_workspace_list`: List all registered workspaces
 
 See `openwebui_tools.json` for complete tool schemas with parameter definitions.
 
@@ -109,6 +118,15 @@ Response includes `ingested_documents`, `ingested_chunks`, `errors`, and `index_
 **Supported formats:** .md, .txt, .py, .json
 
 **Path safety:** Rejects system directories (/etc, /var, etc.) and path traversals.
+
+### POST /workspace/create
+```json
+{"path": "/home/user/my-project", "workspace_id": "optional-id"}
+```
+
+Creates a workspace scoped to the given path. Execution is refused outside workspace boundaries.
+
+**Workspace Isolation:** "Lathe reasons globally. The app scopes locally. Executors act only inside workspaces."
 
 ## Python API (lathe_app)
 
