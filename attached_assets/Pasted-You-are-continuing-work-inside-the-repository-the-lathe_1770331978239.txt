@@ -1,0 +1,220 @@
+You are continuing work inside the repository: the-lathe
+
+THIS IS A LOCKED ARCHITECTURAL CHANGE.
+Follow the instructions EXACTLY.
+Do NOT improvise.
+Do NOT refactor unrelated code.
+Do NOT modify lathe/ in any way.
+
+====================================
+OBJECTIVE
+====================================
+
+Add first-class GOAL PERSISTENCE so the system:
+
+• Knows what it is trying to accomplish
+• Knows when it is DONE
+• Knows when it has FAILED
+• Stops infinite loops
+• Forces reevaluation instead of thrashing
+
+Models must NEVER decide completion.
+Completion requires explicit verification.
+
+====================================
+ARCHITECTURAL LAW (NON-NEGOTIABLE)
+====================================
+
+• lathe/ is PURE and STATELESS
+• ALL new code lives in lathe_app/
+• Goals are DATA, not behavior
+• Verification is STRUCTURAL, not semantic
+• Deterministic > clever
+• Failure must STOP progress
+
+====================================
+STEP 1 — CREATE GOAL SCHEMAS
+====================================
+
+Create a new file:
+
+lathe_app/goals.py
+
+Define ONLY immutable data structures and pure helpers.
+NO execution logic.
+NO side effects.
+NO imports from lathe/.
+
+------------------------------------
+GoalRecord
+------------------------------------
+
+from dataclasses import dataclass
+from typing import List, Optional, Literal
+import time
+import uuid
+
+@dataclass(frozen=True)
+class GoalRecord:
+    goal_id: str
+    description: str
+    success_criteria: List[str]
+
+    max_runs: int
+    max_executions: int
+    max_time_seconds: int
+
+    created_at: float
+    status: Literal[
+        "pending",
+        "in_progress",
+        "needs_rethink",
+        "completed",
+        "abandoned"
+    ]
+
+    runs: List[str]
+    executions: int
+    last_verification: Optional["VerificationResult"]
+
+------------------------------------
+VerificationResult
+------------------------------------
+
+@dataclass(frozen=True)
+class VerificationResult:
+    passed: bool
+    reason: str
+    evidence: List[str]
+    verified_at: float
+
+RULES:
+• All fields required unless Optional
+• No mutable defaults
+• No logic inside dataclasses
+• No I/O
+• No global state
+
+====================================
+STEP 2 — PURE FACTORY HELPERS
+====================================
+
+Add the following functions in the SAME file.
+
+------------------------------------
+create_goal
+------------------------------------
+
+def create_goal(
+    description: str,
+    success_criteria: List[str],
+    *,
+    max_runs: int = 5,
+    max_executions: int = 3,
+    max_time_seconds: int = 600
+) -> GoalRecord:
+
+Behavior:
+• Generates goal_id using uuid.uuid4()
+• Sets created_at = time.time()
+• status = "pending"
+• runs = []
+• executions = 0
+• last_verification = None
+• Returns a NEW GoalRecord
+
+------------------------------------
+record_verification
+------------------------------------
+
+def record_verification(
+    goal: GoalRecord,
+    result: VerificationResult
+) -> GoalRecord:
+
+Behavior:
+• Returns a NEW GoalRecord
+• Updates last_verification
+• If result.passed == True → status = "completed"
+• If result.passed == False → status unchanged
+• NEVER mutate the input goal
+
+====================================
+STEP 3 — OPTIONAL GOAL STORAGE
+====================================
+
+Modify:
+
+lathe_app/storage.py
+
+Add goal persistence WITHOUT breaking existing APIs.
+
+Requirements:
+• Add GoalStorage interface
+• Add InMemoryGoalStorage implementation
+• Methods:
+  - save_goal(goal)
+  - load_goal(goal_id)
+  - list_goals()
+• Must NOT affect existing Run storage
+• Must be optional and pluggable
+
+====================================
+STEP 4 — TESTS (MANDATORY)
+====================================
+
+Create:
+
+tests/app/test_goals.py
+
+Minimum tests REQUIRED:
+• create_goal initializes correct defaults
+• goal_id is unique per call
+• record_verification returns a NEW object
+• passed verification sets status = completed
+• failed verification does NOT complete goal
+• original GoalRecord is never mutated
+• goal storage save/load roundtrip works
+
+TEST RULES:
+• Do NOT mock time
+• Do NOT mock uuid
+• Assert structure, not formatting
+• All existing tests must continue to pass
+
+====================================
+STEP 5 — EXPLICIT NON-GOALS
+====================================
+
+DO NOT:
+• Add execution loops
+• Add budget enforcement
+• Add retries
+• Add model calls
+• Modify orchestrator
+• Modify executor
+• Modify kernel
+• Add OpenWebUI tools
+
+This change is DATA + STRUCTURE ONLY.
+
+====================================
+ACCEPTANCE CRITERIA
+====================================
+
+• All existing tests pass
+• New tests pass
+• lathe/ untouched
+• No behavior changes elsewhere
+• Code is boring, obvious, and auditable
+
+====================================
+FINAL REPORT
+====================================
+
+After completion, report:
+• Files added or modified
+• Total test count
+• Confirmation that lathe/ was not changed
+
+Proceed carefully.

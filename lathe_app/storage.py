@@ -10,6 +10,7 @@ from abc import ABC, abstractmethod
 from typing import Dict, List, Optional
 
 from lathe_app.artifacts import RunRecord
+from lathe_app.goals import GoalRecord
 
 
 class Storage(ABC):
@@ -77,6 +78,46 @@ class InMemoryStorage(Storage):
     def get_all_runs(self) -> List[RunRecord]:
         """Get all runs. For query operations."""
         return list(self._runs.values())
+
+
+class GoalStorage(ABC):
+    """
+    Abstract goal storage interface.
+
+    Implementations must be thread-safe if used concurrently.
+    """
+
+    @abstractmethod
+    def save_goal(self, goal: GoalRecord) -> None:
+        pass
+
+    @abstractmethod
+    def load_goal(self, goal_id: str) -> Optional[GoalRecord]:
+        pass
+
+    @abstractmethod
+    def list_goals(self) -> List[GoalRecord]:
+        pass
+
+
+class InMemoryGoalStorage(GoalStorage):
+    """
+    In-memory goal storage implementation.
+
+    No persistence to disk. Data is lost on process exit.
+    """
+
+    def __init__(self):
+        self._goals: Dict[str, GoalRecord] = {}
+
+    def save_goal(self, goal: GoalRecord) -> None:
+        self._goals[goal.goal_id] = goal
+
+    def load_goal(self, goal_id: str) -> Optional[GoalRecord]:
+        return self._goals.get(goal_id)
+
+    def list_goals(self) -> List[GoalRecord]:
+        return list(self._goals.values())
 
 
 class NullStorage(Storage):
