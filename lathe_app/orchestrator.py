@@ -3,6 +3,7 @@ Lathe App Orchestrator
 
 The workflow loop that drives Lathe.
 Stateless - all state is in the artifacts returned.
+Storage is optional and injected.
 """
 from typing import Any, Callable, Dict, Optional
 
@@ -16,6 +17,7 @@ from lathe_app.artifacts import (
     ProposalArtifact,
     PlanArtifact,
 )
+from lathe_app.storage import Storage
 
 
 def _default_agent_fn(normalized, model_id: str) -> str:
@@ -42,20 +44,32 @@ class Orchestrator:
     2. Calls Lathe pipeline
     3. Classifies results (success / refusal)
     4. Returns structured RunRecords
+    5. Optionally persists runs to storage
     
     The orchestrator is STATELESS.
-    It may call Lathe multiple times but stores nothing.
+    It may call Lathe multiple times but stores nothing internally.
+    Persistence is delegated to the injected Storage.
+    
+    PROPOSALS DO NOT AUTO-APPLY.
+    Execution requires an explicit call to execute_proposal().
     """
     
-    def __init__(self, agent_fn: Callable = None):
+    def __init__(
+        self,
+        agent_fn: Callable = None,
+        storage: Storage = None,
+    ):
         """
         Initialize orchestrator.
         
         Args:
             agent_fn: Function to call for model execution.
                       Signature: (normalized, model_id) -> str
+            storage: Optional storage backend for persisting runs.
+                     If None, runs are not persisted.
         """
         self._agent_fn = agent_fn or _default_agent_fn
+        self._storage = storage
     
     def execute(
         self,
@@ -76,6 +90,9 @@ class Orchestrator:
             
         Returns:
             RunRecord with the execution result.
+            
+        NOTE: Proposals are NOT auto-applied.
+        Call execute_proposal() explicitly to apply changes.
         """
         model_id = model or FALLBACK_MODEL
         
@@ -101,7 +118,12 @@ class Orchestrator:
             enable_observability=True,
         )
         
-        return self._build_run_record(input_data, result)
+        run_record = self._build_run_record(input_data, result)
+        
+        if self._storage is not None:
+            self._storage.save_run(run_record)
+        
+        return run_record
     
     def _build_run_record(
         self,

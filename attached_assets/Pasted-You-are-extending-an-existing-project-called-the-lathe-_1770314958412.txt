@@ -1,0 +1,79 @@
+You are extending an existing project called "the-lathe" which now includes a clean application layer under lathe_app/.
+
+Lathe (the kernel) is COMPLETE and MUST NOT be modified.
+lathe_app (the shell) is where all state, persistence, and side effects live.
+
+Your task is to add SAFE, OPTIONAL persistence and an EXPLICIT execution boundary so this can function as a real application without compromising determinism or safety.
+
+GOALS
+1. Add persistence for runs and artifacts.
+2. Add a gated execution layer for applying proposals.
+3. Make side effects explicit, auditable, and opt-in.
+
+NON-NEGOTIABLE CONSTRAINTS
+- Lathe must remain stateless and unchanged.
+- Orchestrator must remain stateless.
+- Persistence must be pluggable (default: in-memory).
+- Proposals must NEVER auto-apply.
+- Execution must require an explicit call.
+- Refusal artifacts must NEVER be executable.
+
+REQUIRED IMPLEMENTATION
+
+1. Create lathe_app/storage.py
+   - Define a Storage interface:
+     - save_run(run: RunRecord)
+     - load_run(run_id: str)
+     - list_runs()
+   - Implement:
+     - InMemoryStorage (default)
+   - Storage must be injectable into the orchestrator.
+
+2. Create lathe_app/executor.py
+   - Define:
+     - PatchExecutor
+     - ExecutionResult (success, failure, diff, error)
+   - Executor:
+     - Accepts ONLY ProposalArtifact
+     - Applies patches ONLY when explicitly called
+     - Rejects RefusalArtifact and PlanArtifact
+     - Never touches Lathe
+
+3. Update lathe_app/orchestrator.py
+   - Accept optional:
+     - storage: Storage
+   - On run_request:
+     - Produce RunRecord
+     - Save run if storage is provided
+   - DO NOT auto-execute proposals
+
+4. Add explicit execution API
+   - Expose:
+     execute_proposal(run_id, *, dry_run=True)
+   - Must:
+     - Load run from storage
+     - Validate artifact type
+     - Execute through PatchExecutor
+     - Return ExecutionResult
+
+5. Tests (tests/app/)
+   Add tests proving:
+   - Lathe remains untouched
+   - Runs persist correctly
+   - Proposals do not auto-apply
+   - Refusals cannot be executed
+   - Execution requires explicit invocation
+   - Dry-run does not mutate filesystem
+
+ARCHITECTURAL LAW (WRITE THIS COMMENT VERBATIM IN executor.py)
+
+"Lathe reasons.
+The app decides.
+Executors act.
+Nothing else is allowed."
+
+When complete, print:
+- Where state lives
+- Where side effects live
+- Why Lathe is still pure
+- Why this is now a real app
