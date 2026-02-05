@@ -188,6 +188,40 @@
         "method": "POST",
         "url": "http://HOST:3001/knowledge/ingest"
       }
+    },
+    {
+      "name": "lathe_workspace_create",
+      "description": "Create a new workspace for project isolation. Each workspace scopes all file operations to a specific directory.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "path": {
+            "type": "string",
+            "description": "Path to the workspace root directory"
+          },
+          "workspace_id": {
+            "type": "string",
+            "description": "Optional custom workspace ID. Auto-generated if not provided."
+          }
+        },
+        "required": ["path"]
+      },
+      "endpoint": {
+        "method": "POST",
+        "url": "http://HOST:3001/workspace/create"
+      }
+    },
+    {
+      "name": "lathe_workspace_list",
+      "description": "List all registered workspaces.",
+      "parameters": {
+        "type": "object",
+        "properties": {}
+      },
+      "endpoint": {
+        "method": "GET",
+        "url": "http://HOST:3001/workspace/list"
+      }
     }
   ],
   "port_configuration": {

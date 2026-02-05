@@ -101,6 +101,8 @@ Endpoints:
   GET  /fs/run/<id>/files - Files touched by run
   GET  /knowledge/status - Knowledge index status
   POST /knowledge/ingest - Ingest documents into knowledge index
+  GET  /workspace/list   - List all workspaces
+  POST /workspace/create - Create a new workspace
 """
 import json
 import logging
@@ -197,6 +199,8 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.send_json({"run_id": run_id, "files": files, "results": []})
             elif path == "/knowledge/status":
                 self.handle_knowledge_status()
+            elif path == "/workspace/list":
+                self.handle_workspace_list()
             else:
                 self.send_json(make_refusal("not_found", f"Unknown path: {path}"), 404)
         except Exception as e:
@@ -222,6 +226,8 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.handle_review(body)
             elif path == "/knowledge/ingest":
                 self.handle_knowledge_ingest(body)
+            elif path == "/workspace/create":
+                self.handle_workspace_create(body)
             else:
                 self.send_json(make_refusal("not_found", f"Unknown path: {path}"), 404)
         except Exception as e:
@@ -390,6 +396,48 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json(response)
         except Exception as e:
             self.send_json(make_refusal("ingestion_error", str(e)))
+    
+    def handle_workspace_list(self):
+        """Handle GET /workspace/list - list all workspaces."""
+        try:
+            from lathe_app.workspace import get_default_manager
+            
+            manager = get_default_manager()
+            workspaces = manager.list_workspaces()
+            
+            response = {
+                "workspaces": [ws.to_dict() for ws in workspaces],
+                "count": len(workspaces),
+                "results": [],
+            }
+            self.send_json(response)
+        except Exception as e:
+            self.send_json(make_refusal("workspace_error", str(e)))
+    
+    def handle_workspace_create(self, body: Dict[str, Any]):
+        """Handle POST /workspace/create - create a new workspace."""
+        path = body.get("path")
+        workspace_id = body.get("workspace_id")
+        
+        if not path:
+            self.send_json(make_refusal("missing_fields", "Missing required field: path"), 400)
+            return
+        
+        try:
+            from lathe_app.workspace import get_default_manager
+            
+            manager = get_default_manager()
+            workspace = manager.create_workspace(path, workspace_id=workspace_id)
+            
+            response = {
+                "workspace": workspace.to_dict(),
+                "results": [],
+            }
+            self.send_json(response)
+        except ValueError as e:
+            self.send_json(make_refusal("invalid_path", str(e)), 400)
+        except Exception as e:
+            self.send_json(make_refusal("workspace_error", str(e)))
 
 
 DEFAULT_PORT = 3001

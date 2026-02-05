@@ -9,6 +9,11 @@ RAG Enhancement:
 - If intent == rag, queries knowledge index for evidence
 - Missing index returns empty results (not error)
 - Kernel RAG remains untouched
+
+Workspace Isolation:
+- Operations can be scoped to a workspace
+- No workspace = default workspace (current directory)
+- Workspace data never leaks into kernel
 """
 from typing import Any, Callable, Dict, List, Optional
 
@@ -23,6 +28,7 @@ from lathe_app.artifacts import (
     PlanArtifact,
 )
 from lathe_app.storage import Storage
+from lathe_app.workspace.context import WorkspaceContext, get_current_context
 
 
 def query_knowledge_index(query: str, k: int = 5) -> List[Dict[str, Any]]:
@@ -110,6 +116,7 @@ class Orchestrator:
         why: Dict[str, Any],
         *,
         model: str = None,
+        workspace_id: str = None,
     ) -> RunRecord:
         """
         Execute a single request through Lathe.
@@ -119,6 +126,7 @@ class Orchestrator:
             task: The task description
             why: The WHY record
             model: Optional model override (defaults to FALLBACK_MODEL)
+            workspace_id: Optional workspace to scope this run to
             
         Returns:
             RunRecord with the execution result.
@@ -128,12 +136,16 @@ class Orchestrator:
         """
         model_id = model or FALLBACK_MODEL
         
+        context = self._get_workspace_context(workspace_id)
+        
         input_data = ArtifactInput(
             intent=intent,
             task=task,
             why=why,
             model_requested=model_id,
         )
+        
+        input_data.workspace_id = context.workspace_id
         
         kernel_intent = intent
         if intent == "plan":
@@ -226,3 +238,22 @@ class Orchestrator:
                 model_fingerprint=response.get("model_fingerprint"),
                 observability=observability,
             )
+    
+    def _get_workspace_context(self, workspace_id: str = None) -> WorkspaceContext:
+        """
+        Get workspace context for a request.
+        
+        Args:
+            workspace_id: Optional workspace ID
+            
+        Returns:
+            WorkspaceContext (default if no workspace specified)
+        """
+        if workspace_id is None:
+            return get_current_context()
+        
+        context = WorkspaceContext.from_workspace_id(workspace_id)
+        if context is None:
+            return get_current_context()
+        
+        return context

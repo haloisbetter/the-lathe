@@ -27,6 +27,7 @@ class ArtifactInput:
     task: str
     why: Dict[str, Any]
     model_requested: Optional[str] = None
+    workspace_id: Optional[str] = None
 
 
 @dataclass
