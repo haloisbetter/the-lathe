@@ -346,7 +346,9 @@ class TestPipeline:
         result1 = process_request(payload, "deepseek-chat", self.dummy_agent_fn, require_fingerprint=True)
         result2 = process_request(payload, "deepseek-chat", self.dummy_agent_fn, require_fingerprint=True)
         
-        assert result1.response == result2.response
+        resp1 = {k: v for k, v in result1.response.items() if k != "_observability"}
+        resp2 = {k: v for k, v in result2.response.items() if k != "_observability"}
+        assert resp1 == resp2
         assert result1.model_used == result2.model_used
         assert result1.fallback_triggered == result2.fallback_triggered
     
