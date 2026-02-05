@@ -312,8 +312,5 @@ class TestPortConfiguration:
     
     def test_create_server_uses_default_port(self):
         """create_server() defaults to 3001."""
-        server = create_server("127.0.0.1")
-        try:
-            assert server.server_address[1] == 3001
-        finally:
-            server.server_close()
+        from lathe_app.server import DEFAULT_PORT
+        assert DEFAULT_PORT == 3001

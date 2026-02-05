@@ -1,0 +1,209 @@
+You are working inside the repository `the-lathe`.
+
+This repository already has a PURE, DETERMINISTIC kernel (`lathe/`) and a SAFE application shell (`lathe_app/`).
+
+Your task is to IMPLEMENT the missing application-level capabilities WITHOUT violating any existing architectural guarantees.
+
+========================
+ARCHITECTURAL LAW (LOCKED)
+========================
+• lathe/ MUST remain pure, stateless, deterministic
+• lathe/ MUST NOT store state, touch filesystem, or add UI logic
+• lathe_app/ is the ONLY place where state, persistence, execution, and HTTP live
+• Refusal == success (HTTP 200, structured JSON)
+• No prose, no markdown, no side-channel output in machine responses
+• All responses must remain strictly JSON
+• Existing tests MUST continue to pass
+• Add new tests ONLY where behavior is new
+• Never weaken guardrails or fallback logic
+
+========================
+GOAL
+========================
+Complete the AI application stack by adding:
+1) Run history recall
+2) Human review states
+3) Read-only filesystem awareness
+4) Planning as a first-class artifact
+5) OpenWebUI-compatible tools for all of the above
+
+========================
+MISSING CAPABILITIES TO IMPLEMENT
+========================
+
+------------------------
+1) RUN HISTORY QUERY TOOL
+------------------------
+Add read-only run querying to lathe_app.
+
+Implement:
+• Search runs by:
+  - intent
+  - outcome (success / refusal)
+  - file paths touched
+  - time range
+
+Files:
+• lathe_app/storage.py (extend interface)
+• lathe_app/query.py (new)
+
+Expose via HTTP:
+• GET /runs
+• GET /runs?intent=propose
+• GET /runs?outcome=refusal
+• GET /runs?file=lathe/server.py
+
+OpenWebUI Tool:
+• name: lathe_runs
+• read-only
+• no side effects
+
+------------------------
+2) HUMAN REVIEW STATE MACHINE
+------------------------
+Add explicit review states to proposals.
+
+States:
+• proposed
+• reviewed
+• approved
+• rejected
+• executed
+
+Rules:
+• execute_proposal() MUST refuse unless state == approved
+• state transitions must be explicit and auditable
+• no automatic transitions
+• default state after propose = proposed
+
+Files:
+• lathe_app/artifacts.py (extend ProposalArtifact)
+• lathe_app/review.py (new)
+• lathe_app/executor.py (enforce approval)
+
+Expose via HTTP:
+• POST /review
+  { run_id, action: approve|reject|review }
+
+OpenWebUI Tool:
+• name: lathe_review
+
+------------------------
+3) READ-ONLY FILESYSTEM AWARENESS TOOL
+------------------------
+Add a read-only filesystem inspection tool.
+
+Capabilities:
+• repo tree (depth-limited)
+• git status summary
+• git diff summary
+• files touched by run_id
+
+Rules:
+• NEVER write to disk
+• NEVER stage, commit, or modify files
+• MUST refuse unsafe paths
+
+Files:
+• lathe_app/fs.py (new)
+• lathe_app/server.py (wire endpoints)
+
+Expose via HTTP:
+• GET /fs/tree
+• GET /fs/status
+• GET /fs/diff
+• GET /fs/run/<id>/files
+
+OpenWebUI Tool:
+• name: lathe_fs
+• strictly read-only
+
+------------------------
+4) PLAN AS A FIRST-CLASS INTENT
+------------------------
+Introduce intent = "plan"
+
+Behavior:
+• Produces a PlanArtifact
+• NO code changes
+• NO execution
+• Used to decompose work before propose
+
+PlanArtifact must include:
+• ordered steps
+• estimated risk
+• affected components
+• recommendation: proceed | revise | abort
+
+Files:
+• lathe_app/artifacts.py (add PlanArtifact)
+• lathe_app/orchestrator.py (support intent=plan)
+
+Expose via HTTP:
+• POST /agent (intent=plan)
+
+OpenWebUI Tool:
+• lathe_agent (already registered)
+• plan handled as normal intent
+
+------------------------
+5) OPENWEBUI TOOL CONTRACTS (STRICT)
+------------------------
+Add tool JSON schemas at the TOP of lathe_app/server.py
+(do not add OpenWebUI logic anywhere else)
+
+Tools to define:
+• lathe_agent
+• lathe_runs
+• lathe_review
+• lathe_execute
+• lathe_fs
+
+Rules:
+• Exact JSON schemas
+• No auto-routing
+• No multi-tool chaining
+• Each tool does ONE thing
+
+========================
+TEST REQUIREMENTS
+========================
+Add tests to:
+• tests/app/test_run_queries.py
+• tests/app/test_review_states.py
+• tests/app/test_fs_readonly.py
+• tests/app/test_plan_intent.py
+
+Tests MUST assert:
+• refusal is returned on invalid state
+• observability remains unchanged
+• determinism (excluding trace_id)
+• filesystem is never modified
+• execution cannot occur without approval
+
+========================
+OUT OF SCOPE (DO NOT DO)
+========================
+• Do NOT add model logic
+• Do NOT change fallback behavior
+• Do NOT add memory to lathe/
+• Do NOT add vector DBs
+• Do NOT auto-execute proposals
+• Do NOT introduce async/background workers
+
+========================
+FINAL DELIVERABLE
+========================
+• All tests passing
+• Server running
+• OpenWebUI can:
+  - plan
+  - reason
+  - propose
+  - review
+  - inspect filesystem
+  - execute safely
+• Lathe kernel remains unchanged and pure
+
+Proceed step by step.
+If a step would violate constraints, return a structured refusal instead of guessing.

@@ -103,8 +103,12 @@ class Orchestrator:
             model_requested=model_id,
         )
         
+        kernel_intent = intent
+        if intent == "plan":
+            kernel_intent = "think"
+        
         payload = {
-            "intent": intent,
+            "intent": kernel_intent,
             "task": task,
             "why": why,
         }

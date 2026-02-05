@@ -57,3 +57,22 @@ def to_jsonable_execution_result(result: ExecutionResult) -> Dict[str, Any]:
         "results": [],
     }
     return data
+
+
+def to_jsonable_query_result(result) -> Dict[str, Any]:
+    """
+    Serialize a QueryResult to a JSON-safe dictionary.
+    """
+    return {
+        "runs": [to_jsonable_runrecord(r) for r in result.runs],
+        "total": result.total,
+        "query": _make_jsonable(result.query),
+        "results": [],
+    }
+
+
+def to_jsonable_review_result(result) -> Dict[str, Any]:
+    """
+    Serialize a ReviewResult to a JSON-safe dictionary.
+    """
+    return result.to_dict()

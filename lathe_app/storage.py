@@ -73,6 +73,10 @@ class InMemoryStorage(Storage):
     def clear(self) -> None:
         """Clear all stored runs. For testing only."""
         self._runs.clear()
+    
+    def get_all_runs(self) -> List[RunRecord]:
+        """Get all runs. For query operations."""
+        return list(self._runs.values())
 
 
 class NullStorage(Storage):

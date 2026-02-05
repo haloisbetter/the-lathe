@@ -3,6 +3,10 @@ Lathe App HTTP Server
 
 Thin HTTP adapter exposing lathe_app to external tools like OpenWebUI.
 
+Port assignments:
+- OpenWebUI → 3000 (external, not managed here)
+- Lathe App → 3001 (default)
+
 OpenWebUI Tool Definitions:
 --------------------------
 Tool 1: lathe_agent
@@ -24,7 +28,7 @@ Tool 1: lathe_agent
 Tool 2: lathe_execute
 {
   "name": "lathe_execute",
-  "description": "Execute a proposal from a previous run",
+  "description": "Execute an approved proposal from a previous run",
   "parameters": {
     "type": "object",
     "properties": {
@@ -34,26 +38,81 @@ Tool 2: lathe_execute
     "required": ["run_id"]
   }
 }
+
+Tool 3: lathe_runs
+{
+  "name": "lathe_runs",
+  "description": "Search and query run history (read-only)",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "intent": {"type": "string", "description": "Filter by intent type"},
+      "outcome": {"type": "string", "enum": ["success", "refusal"]},
+      "file": {"type": "string", "description": "Filter by file path touched"},
+      "since": {"type": "string", "description": "ISO timestamp lower bound"},
+      "until": {"type": "string", "description": "ISO timestamp upper bound"},
+      "limit": {"type": "integer", "default": 100}
+    }
+  }
+}
+
+Tool 4: lathe_review
+{
+  "name": "lathe_review",
+  "description": "Review, approve, or reject a proposal",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "run_id": {"type": "string", "description": "ID of the run to review"},
+      "action": {"type": "string", "enum": ["review", "approve", "reject"]},
+      "comment": {"type": "string", "description": "Optional review comment"}
+    },
+    "required": ["run_id", "action"]
+  }
+}
+
+Tool 5: lathe_fs
+{
+  "name": "lathe_fs",
+  "description": "Read-only filesystem inspection (tree, git status, diff)",
+  "parameters": {
+    "type": "object",
+    "properties": {
+      "operation": {"type": "string", "enum": ["tree", "status", "diff"]},
+      "path": {"type": "string", "description": "Path for tree operation", "default": "."},
+      "staged": {"type": "boolean", "description": "Show staged diff", "default": false}
+    },
+    "required": ["operation"]
+  }
+}
 --------------------------
 
 Endpoints:
   POST /agent      - Create a run
-  POST /execute    - Execute a proposal
+  POST /execute    - Execute an approved proposal
+  POST /review     - Review/approve/reject a proposal
   GET  /health     - Health check
-  GET  /runs       - List all runs
+  GET  /runs       - List/search runs
   GET  /runs/<id>  - Load a specific run
+  GET  /runs/<id>/review - Get review state
+  GET  /fs/tree    - Directory tree (read-only)
+  GET  /fs/status  - Git status (read-only)
+  GET  /fs/diff    - Git diff (read-only)
+  GET  /fs/run/<id>/files - Files touched by run
 """
 import json
 import logging
 import os
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from typing import Any, Dict, Optional
-from urllib.parse import urlparse
+from urllib.parse import urlparse, parse_qs
 
 import lathe_app
 from lathe_app.http_serialization import (
     to_jsonable_runrecord,
     to_jsonable_execution_result,
+    to_jsonable_query_result,
+    to_jsonable_review_result,
 )
 
 logger = logging.getLogger(__name__)
@@ -105,12 +164,15 @@ class AppHandler(BaseHTTPRequestHandler):
         try:
             parsed = urlparse(self.path)
             path = parsed.path.rstrip("/")
+            query = parse_qs(parsed.query)
             
             if path == "/health":
                 self.send_json({"ok": True, "results": []})
             elif path == "/runs":
-                runs = lathe_app.list_runs()
-                self.send_json({"runs": runs, "results": []})
+                self.handle_runs_query(query)
+            elif path.startswith("/runs/") and "/review" in path:
+                run_id = path.split("/")[2]
+                self.handle_get_review(run_id)
             elif path.startswith("/runs/"):
                 run_id = path[6:]
                 run = lathe_app.load_run(run_id)
@@ -118,6 +180,19 @@ class AppHandler(BaseHTTPRequestHandler):
                     self.send_json(make_refusal("not_found", f"Run {run_id} not found"), 404)
                 else:
                     self.send_json(to_jsonable_runrecord(run))
+            elif path == "/fs/tree":
+                self.handle_fs_tree(query)
+            elif path == "/fs/status":
+                result = lathe_app.fs_status()
+                self.send_json(result.to_dict())
+            elif path == "/fs/diff":
+                staged = query.get("staged", ["false"])[0].lower() == "true"
+                result = lathe_app.fs_diff(staged=staged)
+                self.send_json(result.to_dict())
+            elif path.startswith("/fs/run/") and path.endswith("/files"):
+                run_id = path.split("/")[3]
+                files = lathe_app.fs_run_files(run_id)
+                self.send_json({"run_id": run_id, "files": files, "results": []})
             else:
                 self.send_json(make_refusal("not_found", f"Unknown path: {path}"), 404)
         except Exception as e:
@@ -139,6 +214,8 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.handle_agent(body)
             elif path == "/execute":
                 self.handle_execute(body)
+            elif path == "/review":
+                self.handle_review(body)
             else:
                 self.send_json(make_refusal("not_found", f"Unknown path: {path}"), 404)
         except Exception as e:
@@ -178,7 +255,7 @@ class AppHandler(BaseHTTPRequestHandler):
         self.send_json(response)
     
     def handle_execute(self, body: Dict[str, Any]):
-        """Handle POST /execute - execute a proposal."""
+        """Handle POST /execute - execute an approved proposal."""
         run_id = body.get("run_id")
         dry_run = body.get("dry_run", True)
         
@@ -189,6 +266,76 @@ class AppHandler(BaseHTTPRequestHandler):
         result = lathe_app.execute_proposal(run_id, dry_run=dry_run)
         response = to_jsonable_execution_result(result)
         self.send_json(response)
+    
+    def handle_review(self, body: Dict[str, Any]):
+        """Handle POST /review - review/approve/reject a proposal."""
+        run_id = body.get("run_id")
+        action = body.get("action")
+        comment = body.get("comment")
+        
+        missing = []
+        if not run_id:
+            missing.append("run_id")
+        if not action:
+            missing.append("action")
+        
+        if missing:
+            self.send_json(
+                make_refusal("missing_fields", f"Missing required fields: {', '.join(missing)}"),
+                400
+            )
+            return
+        
+        result = lathe_app.review_run(run_id, action, comment=comment)
+        response = to_jsonable_review_result(result)
+        self.send_json(response)
+    
+    def handle_runs_query(self, query: Dict[str, Any]):
+        """Handle GET /runs with query parameters."""
+        intent = query.get("intent", [None])[0]
+        outcome = query.get("outcome", [None])[0]
+        file = query.get("file", [None])[0]
+        since = query.get("since", [None])[0]
+        until = query.get("until", [None])[0]
+        
+        try:
+            limit = int(query.get("limit", [100])[0])
+        except ValueError:
+            limit = 100
+        
+        result = lathe_app.search_runs(
+            intent=intent,
+            outcome=outcome,
+            file=file,
+            since=since,
+            until=until,
+            limit=limit,
+        )
+        
+        response = to_jsonable_query_result(result)
+        self.send_json(response)
+    
+    def handle_get_review(self, run_id: str):
+        """Handle GET /runs/<id>/review - get review state."""
+        state = lathe_app.get_review_state(run_id)
+        
+        if state is None:
+            self.send_json(make_refusal("not_found", f"No review found for run {run_id}"), 404)
+            return
+        
+        state["results"] = []
+        self.send_json(state)
+    
+    def handle_fs_tree(self, query: Dict[str, Any]):
+        """Handle GET /fs/tree - directory tree."""
+        path = query.get("path", ["."])[0]
+        try:
+            max_depth = int(query.get("max_depth", [3])[0])
+        except ValueError:
+            max_depth = 3
+        
+        result = lathe_app.fs_tree(path, max_depth=max_depth)
+        self.send_json(result.to_dict())
 
 
 DEFAULT_PORT = 3001
