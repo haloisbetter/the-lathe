@@ -1,0 +1,205 @@
+{
+  "tools": [
+    {
+      "name": "lathe_agent",
+      "description": "Create a new Lathe run (propose, think, rag, plan). Proposals require explicit approval before execution.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "intent": {
+            "type": "string",
+            "enum": ["propose", "think", "rag", "plan"],
+            "description": "The type of request: propose (generate patches), think (reasoning), rag (search evidence), plan (multi-step planning)"
+          },
+          "task": {
+            "type": "string",
+            "description": "The task to execute"
+          },
+          "why": {
+            "type": "object",
+            "description": "WHY record with goal, context, evidence, decision, risk_level, options_considered, guardrails, verification_steps",
+            "properties": {
+              "goal": {"type": "string"},
+              "context": {"type": "string"},
+              "evidence": {"type": "string"},
+              "decision": {"type": "string"},
+              "risk_level": {"type": "string", "enum": ["Low", "Medium", "High", "Critical"]},
+              "options_considered": {"type": "array", "items": {"type": "string"}},
+              "guardrails": {"type": "array", "items": {"type": "string"}},
+              "verification_steps": {"type": "array", "items": {"type": "string"}}
+            },
+            "required": ["goal", "context", "evidence", "decision", "risk_level", "options_considered", "guardrails", "verification_steps"]
+          },
+          "model": {
+            "type": "string",
+            "description": "Optional model override. Tier B models (e.g., Qwen) auto-fallback to DeepSeek for propose/think."
+          }
+        },
+        "required": ["intent", "task", "why"]
+      },
+      "endpoint": {
+        "method": "POST",
+        "url": "http://HOST:3001/agent"
+      }
+    },
+    {
+      "name": "lathe_execute",
+      "description": "Execute an approved proposal. REQUIRES prior approval via lathe_review. Dry run by default.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "description": "ID of the run to execute"
+          },
+          "dry_run": {
+            "type": "boolean",
+            "default": true,
+            "description": "If true, preview changes without applying. Default: true."
+          }
+        },
+        "required": ["run_id"]
+      },
+      "endpoint": {
+        "method": "POST",
+        "url": "http://HOST:3001/execute"
+      }
+    },
+    {
+      "name": "lathe_runs",
+      "description": "Search and query run history (read-only). Filter by intent, outcome, file, or time range.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "intent": {
+            "type": "string",
+            "description": "Filter by intent type (propose, think, rag, plan)"
+          },
+          "outcome": {
+            "type": "string",
+            "enum": ["success", "refusal"],
+            "description": "Filter by outcome"
+          },
+          "file": {
+            "type": "string",
+            "description": "Filter by file path touched"
+          },
+          "since": {
+            "type": "string",
+            "description": "ISO timestamp lower bound (e.g., 2024-01-01T00:00:00Z)"
+          },
+          "until": {
+            "type": "string",
+            "description": "ISO timestamp upper bound"
+          },
+          "limit": {
+            "type": "integer",
+            "default": 100,
+            "description": "Maximum number of results to return"
+          }
+        }
+      },
+      "endpoint": {
+        "method": "GET",
+        "url": "http://HOST:3001/runs"
+      }
+    },
+    {
+      "name": "lathe_review",
+      "description": "Review, approve, or reject a proposal. Execution requires approved state.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "description": "ID of the run to review"
+          },
+          "action": {
+            "type": "string",
+            "enum": ["review", "approve", "reject"],
+            "description": "The review action to take"
+          },
+          "comment": {
+            "type": "string",
+            "description": "Optional review comment"
+          }
+        },
+        "required": ["run_id", "action"]
+      },
+      "endpoint": {
+        "method": "POST",
+        "url": "http://HOST:3001/review"
+      }
+    },
+    {
+      "name": "lathe_fs",
+      "description": "Read-only filesystem inspection (tree, git status, git diff). Safe path validation blocks /etc, /var, /usr, etc.",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "operation": {
+            "type": "string",
+            "enum": ["tree", "status", "diff"],
+            "description": "The filesystem operation: tree (directory listing), status (git status), diff (git diff)"
+          },
+          "path": {
+            "type": "string",
+            "default": ".",
+            "description": "Path for tree operation (relative paths only)"
+          },
+          "max_depth": {
+            "type": "integer",
+            "default": 3,
+            "description": "Maximum depth for tree operation"
+          },
+          "staged": {
+            "type": "boolean",
+            "default": false,
+            "description": "Show staged diff (only for diff operation)"
+          }
+        },
+        "required": ["operation"]
+      },
+      "endpoint": {
+        "method": "GET",
+        "url": "http://HOST:3001/fs/tree",
+        "note": "Use /fs/tree for tree, /fs/status for status, /fs/diff for diff"
+      }
+    }
+  ],
+  "port_configuration": {
+    "openwebui": 3000,
+    "lathe_app": 3001,
+    "lathe_kernel": 5000,
+    "notes": [
+      "lathe_app.server listens on 3001 by default",
+      "Override via LATHE_APP_PORT env var or --port CLI flag",
+      "lathe kernel (lathe/server.py) listens on 5000 for direct access"
+    ]
+  },
+  "response_schemas": {
+    "success": {
+      "type": "object",
+      "required": ["results"],
+      "properties": {
+        "results": {"type": "array", "description": "Always present, may be empty"},
+        "proposals": {"type": "array"},
+        "assumptions": {"type": "array"},
+        "risks": {"type": "array"},
+        "model_fingerprint": {"type": "string"},
+        "_observability": {"type": "object"}
+      }
+    },
+    "refusal": {
+      "type": "object",
+      "required": ["refusal", "reason", "details", "results"],
+      "properties": {
+        "refusal": {"type": "boolean", "const": true},
+        "reason": {"type": "string"},
+        "details": {"type": "string"},
+        "results": {"type": "array", "description": "Always []"}
+      },
+      "note": "Refusal is HTTP 200, not an error. It is a deterministic, successful outcome."
+    }
+  }
+}

@@ -1,0 +1,76 @@
+You are working in the repo: the-lathe.
+
+GOAL
+Make Lathe stable across multiple LLMs by enforcing structure regardless of model behavior, and configure ports so OpenWebUI never conflicts.
+
+NON-NEGOTIABLES
+- Do NOT weaken guardrails.
+- Kernel (lathe/) remains pure and deterministic: no persistence, no OpenWebUI-specific branching.
+- App layer (lathe_app/) may contain orchestration, persistence, review workflow, and filesystem inspection.
+- All HTTP responses must be strict JSON. No prose, no markdown, no HTML.
+- Refusal is a success outcome (HTTP 200) and must follow the refusal schema exactly.
+- Add automatic fallback to DeepSeek for propose/think when a model fails contract validation.
+
+PORTS (LOCKED)
+- OpenWebUI runs on 3000
+- lathe_app server default must be 3001 (configurable by env and CLI flag)
+- lathe kernel server stays on 5000
+
+IMPLEMENTATION REQUIREMENTS (do all)
+1) Contract enforcement (model-agnostic)
+- Add request normalization that canonicalizes ANY input into:
+  { intent, task, why, constraints }
+- Add strict output validation:
+  - Accept only JSON objects matching approved schemas
+  - Anything else (prose, tool-instructions, regex spam, HTML) => structured refusal
+- Require a model fingerprint for think/propose responses:
+  - Missing/invalid fingerprint => refusal
+
+2) Model capability tiers
+- Implement a small, code-enforced tier system:
+  - Tier A: DeepSeek + other proven models => allowed for propose/think
+  - Tier B: weaker/quirky models (e.g., Qwen) => advisory only OR must fallback for propose/think
+- The tier decision must be code-enforced, not prompt-based.
+
+3) Automatic fallback
+- For intents: propose, think
+  - If requested model fails validation OR is not Tier A
+  - Automatically retry once using DeepSeek
+  - Record fallback in observability metadata
+
+4) Observability (passive)
+- Add/extend observability so every response includes an _observability block with:
+  trace_id, stages[], models{requested, used, fallback_triggered, fallback_reason}, outcome{success/refusal}
+
+5) OpenWebUI tool compatibility
+- Ensure ALL success responses include results: [] even if empty.
+- Ensure refusal response EXACT schema:
+  { "refusal": true, "reason": "...", "details": "...", "results": [] }
+
+6) App layer endpoints & tools
+- Ensure lathe_app exposes endpoints for:
+  /health (GET)
+  /agent (POST)   -> creates run + artifacts
+  /execute (POST) -> gated execution requiring approval
+  /runs (GET) and /runs/<id> (GET)
+  /review (POST)  -> proposed -> reviewed -> approved -> executed OR rejected
+  /fs/tree, /fs/status, /fs/diff, /fs/run/<id>/files  (read-only, safe path validation)
+
+TESTS
+- Update/add tests to prove:
+  - Qwen-like garbage output becomes refusal (no traceback)
+  - propose/think fallback triggers to DeepSeek when needed
+  - refusal schema exact
+  - success includes results: []
+  - ports: default 3001; env LATHE_APP_PORT overrides; --port overrides env
+  - execution requires approval state
+  - filesystem inspection blocks unsafe paths
+
+DELIVERABLES
+- Implement code + tests.
+- Run full test suite and ensure all pass.
+- Provide the exact OpenWebUI tool JSON definitions for:
+  lathe_agent, lathe_execute, lathe_runs, lathe_review, lathe_fs
+  with endpoints pointing to http://HOST:3001/...
+
+Do not stop early. Make it boring and predictable.

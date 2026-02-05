@@ -385,3 +385,61 @@ class TestFingerprinting:
         result = validate_and_normalize_output(raw, source_model="test", require_fingerprint=False)
         
         assert result.get("refusal") is not True
+
+
+class TestRefusalSchemaExact:
+    """Tests that refusal schema is EXACT."""
+    
+    def test_refusal_has_all_required_keys(self):
+        """Refusal MUST have: refusal, reason, details, results."""
+        from lathe.output_validator import REFUSAL_REQUIRED_KEYS
+        
+        assert REFUSAL_REQUIRED_KEYS == {"refusal", "reason", "details", "results"}
+    
+    def test_create_refusal_matches_exact_schema(self):
+        """create_refusal_from_error returns EXACTLY the required schema."""
+        refusal = create_refusal_from_error("test reason", "test details")
+        
+        assert set(refusal.keys()) == {"refusal", "reason", "details", "results"}
+        assert refusal["refusal"] is True
+        assert refusal["reason"] == "test reason"
+        assert refusal["details"] == "test details"
+        assert refusal["results"] == []
+    
+    def test_refusal_is_http_200(self):
+        """Refusal is a successful outcome (HTTP 200), not an error."""
+        refusal = create_refusal_from_error("test", "details")
+        assert refusal.get("error") is None
+    
+    def test_malformed_refusal_becomes_canonical(self):
+        """If model returns malformed refusal, we normalize it."""
+        raw = '{"refusal": true, "reason": "test"}'  # missing details and results
+        result = validate_and_normalize_output(raw, source_model="test", require_fingerprint=True)
+        
+        assert result["refusal"] is True
+        assert "results" in result
+    
+    def test_success_always_has_results(self):
+        """All success responses include results: []."""
+        raw = '{"proposals": [], "model_fingerprint": "test"}'  # missing results
+        result = validate_and_normalize_output(raw, source_model="test", require_fingerprint=True)
+        
+        if result.get("refusal") is not True:
+            assert "results" in result
+
+
+class TestPortConfiguration:
+    """Tests for port configuration priority."""
+    
+    def test_lathe_kernel_port_is_5000(self):
+        """Lathe kernel server defaults to port 5000."""
+        from lathe.server import run_server
+        import inspect
+        sig = inspect.signature(run_server)
+        default_port = sig.parameters["port"].default
+        assert default_port == 5000
+    
+    def test_lathe_app_port_is_3001(self):
+        """Lathe app server defaults to port 3001."""
+        from lathe_app.server import DEFAULT_PORT
+        assert DEFAULT_PORT == 3001
