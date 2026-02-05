@@ -1,0 +1,62 @@
+You are working inside an existing project called "the-lathe".
+
+Lathe itself is a deterministic, stateless reasoning engine and MUST NOT be modified to store state, sessions, or UI logic.
+
+Your task is to build the minimal outer "app layer" required to turn Lathe into a usable application WITHOUT violating its architectural guarantees.
+
+GOALS
+1. Add an orchestrator loop that drives workflows using Lathe.
+2. Introduce first-class artifacts (Run, Plan, Proposal, Refusal).
+3. Keep Lathe pure — all state lives outside of it.
+
+CONSTRAINTS (NON-NEGOTIABLE)
+- Do NOT add persistence, globals, or state to Lathe core modules.
+- Do NOT change Lathe’s refusal semantics.
+- Orchestrator logic must live in a new module.
+- Artifacts must be plain data objects (dataclasses or dicts).
+- Determinism: same input → same Lathe output.
+
+REQUIRED OUTPUT
+Create a new package called `lathe_app/` with:
+
+1. lathe_app/artifacts.py
+   - Define explicit artifact models:
+     - RunRecord
+     - PlanArtifact
+     - ProposalArtifact
+     - RefusalArtifact
+   - Each artifact must include:
+     - id
+     - timestamp
+     - input (intent/task/why)
+     - output
+     - observability trace
+
+2. lathe_app/orchestrator.py
+   - Implement a simple workflow loop:
+     - accept user request
+     - call Lathe pipeline
+     - classify result (success / refusal)
+     - return a structured RunRecord
+   - No retries, no UI logic yet.
+   - Orchestrator may call Lathe multiple times but must remain stateless.
+
+3. lathe_app/__init__.py
+   - Expose a single function:
+     run_request(intent, task, why, *, model=None)
+
+TESTS
+- Add tests under tests/app/
+- Verify:
+  - Refusals produce RefusalArtifact
+  - Successful propose produces ProposalArtifact
+  - Lathe behavior is unchanged
+  - Orchestrator contains all state, Lathe contains none
+
+IMPORTANT
+If you feel tempted to “just put this in Lathe”, STOP.
+Lathe is a kernel. You are building the shell.
+
+When finished, print a short summary of:
+- What Lathe still does
+- What the app layer now does
