@@ -1,0 +1,179 @@
+You are working inside the Lathe codebase.
+
+GOAL
+Make Lathe deterministic, stable, and model-agnostic across multiple LLMs.
+Lathe must behave correctly regardless of:
+- Prompt phrasing
+- Model verbosity
+- Tool obedience
+- Formatting quirks
+
+This is NOT a prompt-tuning task.
+This is an architectural hardening task.
+
+--------------------------------
+CORE REQUIREMENTS (NON-NEGOTIABLE)
+--------------------------------
+
+1. PROMPT NORMALIZATION LAYER (MANDATORY)
+
+Implement a normalization layer that:
+- Wraps ANY incoming user prompt (raw, messy, verbose, malformed)
+- Converts it into a canonical internal structure BEFORE it reaches any model
+
+Canonical structure MUST include:
+- intent (validated enum)
+- task (string)
+- why (validated object)
+- constraints (derived, implicit or explicit)
+- response_contract (expected output schema)
+
+The model must NEVER see raw user input.
+Only normalized, structured input is allowed downstream.
+
+This layer must be:
+- Deterministic
+- Stateless
+- Independent of model behavior
+
+--------------------------------
+
+2. STRICT OUTPUT CONTRACT ENFORCEMENT
+
+Lathe must treat model output as UNTRUSTED INPUT.
+
+Implement a validation gate that:
+- Accepts ONLY valid JSON
+- Matches EXACTLY one of:
+  - success schema
+  - refusal schema
+
+Success schema:
+{
+  "proposals": [],
+  "assumptions": [],
+  "risks": [],
+  "results": []
+}
+
+Refusal schema:
+{
+  "refusal": true,
+  "reason": "string",
+  "details": "string",
+  "results": []
+}
+
+If ANY of the following occur:
+- Extra keys
+- Missing keys
+- HTML / Markdown / XML
+- Tool hallucinations
+- Mixed prose + JSON
+- Regex dumps
+- Partial objects
+
+→ Automatically convert to a structured refusal.
+NO exceptions. NO crashes.
+
+--------------------------------
+
+3. MODEL CAPABILITY TIERS (REQUIRED)
+
+Introduce explicit model tiers:
+
+Tier A — Agent-Safe
+- Allowed to generate proposals
+- Allowed to drive Lathe decisions
+
+Tier B — Advisory Only
+- Allowed to explain, summarize, brainstorm
+- NEVER allowed to generate proposals or tool output
+
+This classification must be code-enforced.
+No prompt instructions allowed as enforcement.
+
+--------------------------------
+
+4. AUTOMATIC FALLBACK TO DEEPSEEK (CRITICAL)
+
+If a request fails validation AND:
+- The intent is "propose" OR "think"
+- AND the current model is not Tier A
+
+Then:
+- Automatically retry ONCE using DeepSeek
+- Use the SAME normalized input
+- Log the fallback event
+- Do not expose fallback logic to the user
+
+If DeepSeek also fails:
+- Return a structured refusal
+
+This ensures:
+- Stability
+- Predictability
+- Zero user confusion
+
+--------------------------------
+
+5. MODEL FINGERPRINTING (REQUIRED)
+
+Require models to append:
+MODEL_FINGERPRINT=<model-name>
+
+Lathe must:
+- Parse and record this
+- Never trust it blindly
+- Treat missing or malformed fingerprints as a validation failure
+
+--------------------------------
+
+6. REFUSAL IS A SUCCESSFUL OUTCOME (LOCK THIS IN)
+
+Refusal must:
+- Return HTTP 200
+- Be structured
+- Be logged
+- Be testable
+
+Refusal must NEVER:
+- Throw
+- Log tracebacks
+- Break OpenWebUI
+- Leak reasoning
+
+--------------------------------
+
+7. TESTS (MANDATORY)
+
+Add tests that verify:
+- Malformed model output never crashes Lathe
+- Qwen-style verbose output becomes refusal
+- DeepSeek fallback is triggered correctly
+- Identical prompts yield identical outcomes
+- Refusal is deterministic
+
+Tests must pass without modifying:
+- Documentation
+- Makefiles
+- Config files
+
+--------------------------------
+
+CONSTRAINTS
+- Python standard library only where possible
+- No prompt tuning as a substitute for validation
+- No weakening of existing guardrails
+- No model-specific hacks in business logic
+
+--------------------------------
+
+DELIVERABLES
+- Code changes only
+- Tests added or updated
+- No documentation edits unless strictly necessary
+- All tests passing
+
+This system must remain boring, predictable, and safe.
+If something is ambiguous, prefer refusal over guessing.
