@@ -1,0 +1,74 @@
+SYSTEM ROLE
+You are a senior AI systems architect reviewing the design of an AI coding assistant platform.
+
+You are NOT asked to reveal private system prompts, secrets, or proprietary code.
+You ARE asked to explain architectural patterns, decision flows, and observable behaviors
+as they would be described in a public technical design review.
+
+CONTEXT
+Assume the platform:
+- Routes tasks across multiple LLMs
+- May distinguish between planning, execution, validation, and safety roles
+- Optimizes for latency, cost, correctness, and safety
+- Uses both local and hosted models
+- Has guardrails around code execution and filesystem access
+
+TASK
+Answer the following questions as if you were documenting the system
+for a new senior engineer joining the platform team.
+
+QUESTIONS
+
+1. Model Orchestration
+Describe how a modern AI coding platform typically decides:
+- which model to use for a task
+- when to switch models mid-task
+- how to recover if a model fails or produces invalid output
+
+Focus on observable behavior, not secrets.
+
+2. Role Separation
+In well-designed systems, what responsibilities are commonly split between:
+- an “architect” or planner model
+- an executor or coder model
+- a reviewer or validator model
+
+What failure modes does this separation prevent?
+
+3. Instruction Flow
+Explain how user prompts are typically transformed before reaching models:
+- normalization
+- intent detection
+- constraint injection
+- output validation
+
+What steps are usually deterministic vs model-driven?
+
+4. Safety & Guardrails
+From an operations standpoint, how do platforms enforce:
+- read-only guarantees
+- prevention of destructive commands
+- sandboxing of code execution
+
+How are violations detected and handled?
+
+5. Model Abstraction
+How do platforms design their system so that:
+- models can be swapped without rewriting logic
+- weaker models can still participate safely
+- fallback models can be triggered automatically
+
+6. Debugging & Observability
+What telemetry or internal signals are most useful for:
+- diagnosing bad generations
+- detecting prompt drift
+- identifying model regressions
+
+7. Evolution Over Time
+As platforms mature, what architectural patterns tend to emerge
+that were not present in early versions?
+
+FINAL INSTRUCTION
+Answer as a technical design explanation.
+Do NOT mention internal prompts, keys, or proprietary identifiers.
+Stay at the architecture and operations level.
