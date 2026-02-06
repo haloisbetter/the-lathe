@@ -183,6 +183,8 @@ class RunRecord:
     model_used: str
     fallback_triggered: bool
     success: bool
+    classification: Any = None  # ResultClassification
+    escalation: Optional[Dict[str, Any]] = None
     
     @classmethod
     def create(
@@ -192,6 +194,8 @@ class RunRecord:
         model_used: str,
         fallback_triggered: bool,
         success: bool,
+        classification: Any = None,
+        escalation: Optional[Dict[str, Any]] = None,
     ) -> "RunRecord":
         return cls(
             id=_generate_id(),
@@ -201,4 +205,6 @@ class RunRecord:
             model_used=model_used,
             fallback_triggered=fallback_triggered,
             success=success,
+            classification=classification,
+            escalation=escalation,
         )

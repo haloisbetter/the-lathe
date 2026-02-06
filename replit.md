@@ -25,8 +25,11 @@ lathe/              # Pure reasoning kernel (NEVER stores state)
 
 lathe_app/          # Application layer (all state lives here)
 ├── __init__.py     # Public API: run_request, execute_proposal, etc.
-├── orchestrator.py # Drives Lathe, produces artifacts
+├── orchestrator.py # Drives Lathe, produces artifacts + speculative model selection
 ├── artifacts.py    # RunRecord, ProposalArtifact, RefusalArtifact
+├── classification.py # Failure taxonomy (FailureType, ResultClassification)
+├── trust.py        # Graduated trust policies (TrustPolicy, evaluate_trust)
+├── stats.py        # Operational dashboard signals (run/workspace/health stats)
 ├── storage.py      # Pluggable persistence (InMemoryStorage, NullStorage)
 ├── executor.py     # PatchExecutor for applying proposals
 ├── http_serialization.py  # JSON serialization
@@ -43,10 +46,11 @@ lathe_app/          # Application layer (all state lives here)
     ├── registry.py # WorkspaceRegistry (by name, in-memory)
     ├── scanner.py  # Stateless filesystem scanner with glob filtering
     ├── indexer.py  # Per-workspace RAG index management
+    ├── risk.py     # Workspace risk assessment (import graph, hotspots)
     ├── errors.py   # Workspace-specific error types
     └── status.py   # Index status tracking
 
-tests/              # 376 tests
+tests/              # 440 tests
 ├── test_*.py       # Core Lathe tests
 └── app/            # App layer tests
 ```
@@ -87,6 +91,9 @@ python -m lathe.server
 | `/knowledge/ingest` | POST | Ingest documents for RAG |
 | `/workspace/list` | GET | List all workspaces |
 | `/workspace/create` | POST | Create a new workspace |
+| `/runs/stats` | GET | Aggregated run statistics (by intent, model, rates) |
+| `/workspace/stats` | GET | Workspace statistics (file counts, extensions) |
+| `/health/summary` | GET | Health summary (recent errors, success rate) |
 
 ### OpenWebUI Tools
 

@@ -201,6 +201,12 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.handle_knowledge_status()
             elif path == "/workspace/list":
                 self.handle_workspace_list()
+            elif path == "/runs/stats":
+                self.handle_run_stats()
+            elif path == "/workspace/stats":
+                self.handle_workspace_stats()
+            elif path == "/health/summary":
+                self.handle_health_summary()
             else:
                 self.send_json(make_refusal("not_found", f"Unknown path: {path}"), 404)
         except Exception as e:
@@ -511,6 +517,43 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json(make_refusal("workspace_error", str(e)), 400)
         except Exception as e:
             logger.exception("Error in workspace ingestion")
+            self.send_json(make_error_response(str(e)), 500)
+
+    def handle_run_stats(self):
+        """Handle GET /runs/stats - aggregated run statistics."""
+        try:
+            from lathe_app.stats import compute_run_stats
+            storage = lathe_app._default_storage
+            runs = storage.get_all_runs() if hasattr(storage, "get_all_runs") else []
+            stats = compute_run_stats(runs)
+            stats["results"] = []
+            self.send_json(stats)
+        except Exception as e:
+            self.send_json(make_error_response(str(e)), 500)
+
+    def handle_workspace_stats(self):
+        """Handle GET /workspace/stats - workspace statistics."""
+        try:
+            from lathe_app.stats import compute_workspace_stats
+            from lathe_app.workspace.registry import get_default_registry
+            registry = get_default_registry()
+            workspaces = registry.list_all()
+            stats = compute_workspace_stats(workspaces)
+            stats["results"] = []
+            self.send_json(stats)
+        except Exception as e:
+            self.send_json(make_error_response(str(e)), 500)
+
+    def handle_health_summary(self):
+        """Handle GET /health/summary - health summary."""
+        try:
+            from lathe_app.stats import compute_health_summary
+            storage = lathe_app._default_storage
+            runs = storage.get_all_runs() if hasattr(storage, "get_all_runs") else []
+            summary = compute_health_summary(runs)
+            summary["results"] = []
+            self.send_json(summary)
+        except Exception as e:
             self.send_json(make_error_response(str(e)), 500)
 
     def handle_workspace_list(self):
