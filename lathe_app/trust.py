@@ -206,6 +206,100 @@ def evaluate_trust(
     )
 
 
+GIT_OPERATIONS_REQUIRING_COMMIT = frozenset({"commit"})
+GIT_OPERATIONS_REQUIRING_PUSH = frozenset({"push"})
+GIT_READ_OPERATIONS = frozenset({"clone", "pull", "status"})
+
+
+def evaluate_git_trust(
+    policy: TrustPolicy,
+    operation: str,
+    workspace_root: Optional[str] = None,
+) -> TrustEvaluation:
+    """Evaluate whether a git operation is allowed under the given trust policy.
+
+    Trust gates for git operations:
+    - Trust 0-1: clone, pull, status allowed; commit and push denied
+    - Trust 2: commit allowed, push denied
+    - Trust 3: commit + push allowed
+    - Trust 4: full autonomy (all operations, boundary checks still apply)
+    """
+    checks_passed: List[str] = []
+    checks_failed: List[str] = []
+
+    if workspace_root and policy.deny_outside_workspace:
+        checks_passed.append("workspace_scoped")
+
+    if operation in GIT_READ_OPERATIONS:
+        checks_passed.append(f"{operation}_is_read_only")
+        return TrustEvaluation(
+            allowed=True,
+            reason=f"Git read operation '{operation}' allowed at any trust level",
+            policy=policy,
+            checks_passed=checks_passed,
+            checks_failed=checks_failed,
+        )
+
+    if policy.trust_level >= 4:
+        checks_passed.append("full_autonomy")
+        return TrustEvaluation(
+            allowed=True,
+            reason="Trust level 4: full autonomy for git operations",
+            policy=policy,
+            checks_passed=checks_passed,
+            checks_failed=checks_failed,
+        )
+
+    if operation in GIT_OPERATIONS_REQUIRING_COMMIT:
+        if policy.trust_level >= 2:
+            checks_passed.append("commit_allowed_at_trust_2")
+            return TrustEvaluation(
+                allowed=True,
+                reason="Trust level 2+: git commit allowed",
+                policy=policy,
+                checks_passed=checks_passed,
+                checks_failed=checks_failed,
+            )
+        else:
+            checks_failed.append("commit_requires_trust_2")
+            return TrustEvaluation(
+                allowed=False,
+                reason=f"Trust level {policy.trust_level}: git commit requires trust level >= 2",
+                policy=policy,
+                checks_passed=checks_passed,
+                checks_failed=checks_failed,
+            )
+
+    if operation in GIT_OPERATIONS_REQUIRING_PUSH:
+        if policy.trust_level >= 3:
+            checks_passed.append("push_allowed_at_trust_3")
+            return TrustEvaluation(
+                allowed=True,
+                reason="Trust level 3+: git push allowed",
+                policy=policy,
+                checks_passed=checks_passed,
+                checks_failed=checks_failed,
+            )
+        else:
+            checks_failed.append("push_requires_trust_3")
+            return TrustEvaluation(
+                allowed=False,
+                reason=f"Trust level {policy.trust_level}: git push requires trust level >= 3",
+                policy=policy,
+                checks_passed=checks_passed,
+                checks_failed=checks_failed,
+            )
+
+    checks_failed.append(f"unknown_git_operation: {operation}")
+    return TrustEvaluation(
+        allowed=False,
+        reason=f"Unknown git operation: {operation}",
+        policy=policy,
+        checks_passed=checks_passed,
+        checks_failed=checks_failed,
+    )
+
+
 def _all_docs(files: List[str]) -> bool:
     if not files:
         return False

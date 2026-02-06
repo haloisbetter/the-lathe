@@ -1,0 +1,121 @@
+You are implementing first-class Git-backed workspace support for The Lathe.
+
+This is a production system with strict architectural boundaries.
+
+ARCHITECTURAL LAW (DO NOT VIOLATE):
+- lathe/ is a pure, stateless reasoning kernel
+- lathe_app/ owns ALL state, filesystem access, git operations, and side effects
+- No git, filesystem writes, subprocesses, or credentials may appear in lathe/
+- Executors apply diffs only; they do not reason or decide
+
+GOAL:
+Allow The Lathe to import, manage, and push Git repositories as first-class workspaces,
+similar to large agentic coding systems (Cursor, Replit Agent, Devin),
+while preserving Lathe’s safety, auditability, and approval gates.
+
+HIGH-LEVEL FEATURES TO ADD:
+
+1) Git-backed Workspaces
+- Each workspace corresponds to a real Git repository on disk
+- Workspaces live under a single root directory (e.g. ~/.lathe/workspaces/)
+- Each workspace directory is a valid git repo (cloned or initialized)
+
+2) Git Operations (App Layer Only)
+Implement a GitWorkspace abstraction in:
+  lathe_app/workspace/git_workspace.py
+
+Responsibilities:
+- clone(repo_url, branch=None)
+- pull()
+- status() -> structured result
+- commit(message)
+- push()
+
+Rules:
+- Use subprocess.run (no shell=True)
+- Whitelist git commands only
+- cwd MUST be locked to the workspace directory
+- No credentials may be logged or returned
+- SSH auth is preferred; HTTPS tokens allowed if stored outside the repo
+
+3) Explicit Git Intent
+Add a new intent handled ONLY by the server layer:
+
+intent: "workspace.git"
+
+Supported actions:
+- clone
+- pull
+- status
+- commit
+- push
+
+Example request:
+{
+  "intent": "workspace.git",
+  "action": "clone",
+  "workspace": "the-juicer-press",
+  "repo": "git@github.com:user/the-juicer-press.git",
+  "branch": "main"
+}
+
+This intent is NOT handled by the kernel and MUST NOT invoke a model.
+
+4) Workspace Manager Integration
+- Extend the existing workspace manager to:
+  - register git-backed workspaces
+  - verify repo cleanliness before execution
+  - reject operations outside workspace root
+- Enforce boundary checks at all trust levels
+
+5) Trust Policy Integration
+Extend trust policy support so git operations obey workspace trust levels:
+
+- Trust 0–1: no commit, no push
+- Trust 2: commit allowed, push denied
+- Trust 3: commit + push allowed
+- Trust 4: full autonomy (BUT workspace boundary checks still apply)
+
+Trust policy is declarative and lives in:
+  .lathe/trust.json
+
+6) Proposal → Commit Flow
+When a proposal is approved and executed:
+- Apply diffs (already exists)
+- If trust allows:
+  - git commit -m "Lathe: <summary>"
+- git push ONLY if explicitly approved or trust allows
+
+7) Observability
+Every git operation must emit structured artifacts:
+- operation type
+- workspace
+- branch
+- clean/dirty status
+- refusal reasons (if any)
+
+No raw command output should be returned to the model.
+
+8) Tests (MANDATORY)
+Add comprehensive tests that verify:
+- Kernel remains untouched
+- Git ops only occur in lathe_app
+- Boundary checks cannot be bypassed
+- Trust levels correctly gate commit/push
+- No filesystem access outside workspace root
+- Workspace clone + propose + commit flow works end-to-end
+
+DO NOT:
+- Move or merge lathe/ and lathe_app/
+- Add hidden state to the kernel
+- Allow git commands via model-generated text
+- Infer intent implicitly — intent must be explicit
+
+DELIVERABLE:
+A clean, test-backed implementation of Git-backed workspaces that allows:
+- importing repos
+- reasoning safely
+- proposing changes
+- committing and pushing with trust-based approval
+
+Stop and ask if ANY requirement conflicts with the existing architecture.

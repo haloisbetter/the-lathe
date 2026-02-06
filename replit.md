@@ -28,10 +28,10 @@ lathe_app/          # Application layer (all state lives here)
 ├── orchestrator.py # Drives Lathe, produces artifacts + speculative model selection
 ├── artifacts.py    # RunRecord, ProposalArtifact, RefusalArtifact
 ├── classification.py # Failure taxonomy (FailureType, ResultClassification)
-├── trust.py        # Graduated trust policies (TrustPolicy, evaluate_trust)
+├── trust.py        # Graduated trust policies (TrustPolicy, evaluate_trust, evaluate_git_trust)
 ├── stats.py        # Operational dashboard signals (run/workspace/health stats)
 ├── storage.py      # Pluggable persistence (InMemoryStorage, NullStorage)
-├── executor.py     # PatchExecutor for applying proposals
+├── executor.py     # PatchExecutor for applying proposals + auto_commit_after_execution
 ├── http_serialization.py  # JSON serialization
 ├── server.py       # HTTP server for OpenWebUI
 ├── knowledge/      # Knowledge ingestion for RAG
@@ -49,10 +49,11 @@ lathe_app/          # Application layer (all state lives here)
     ├── snapshot.py # Workspace snapshot (authoritative manifest + stats)
     ├── memory.py   # File read artifacts + staleness detection + context.md
     ├── risk.py     # Workspace risk assessment (import graph, hotspots)
+    ├── git_workspace.py # Git-backed workspace operations (clone/pull/status/commit/push)
     ├── errors.py   # Workspace-specific error types
     └── status.py   # Index status tracking
 
-tests/              # 500 tests
+tests/              # 561 tests
 ├── test_*.py       # Core Lathe tests
 └── app/            # App layer tests
 ```
@@ -141,6 +142,55 @@ Response includes `ingested_documents`, `ingested_chunks`, `errors`, and `index_
 Creates a workspace scoped to the given path. Execution is refused outside workspace boundaries.
 
 **Workspace Isolation:** "Lathe reasons globally. The app scopes locally. Executors act only inside workspaces."
+
+## Git-backed Workspaces
+
+The Lathe supports first-class Git-backed workspaces, allowing repos to be imported, managed, and pushed with trust-based approval gates.
+
+### Git Intent (workspace.git)
+
+Git operations are handled via `POST /agent` with `intent: workspace.git`. This intent is NOT handled by the kernel and does NOT invoke a model.
+
+```json
+{
+  "intent": "workspace.git",
+  "action": "clone",
+  "workspace": "my-project",
+  "repo": "git@github.com:user/my-project.git",
+  "branch": "main"
+}
+```
+
+Supported actions: `clone`, `pull`, `status`, `commit`, `push`
+
+### Trust Policy for Git Operations
+
+Trust levels gate git write operations (declared in `.lathe/trust.json`):
+
+| Trust Level | clone | pull | status | commit | push |
+|-------------|-------|------|--------|--------|------|
+| 0 (default) | Yes | Yes | Yes | No | No |
+| 1 | Yes | Yes | Yes | No | No |
+| 2 | Yes | Yes | Yes | Yes | No |
+| 3 | Yes | Yes | Yes | Yes | Yes |
+| 4 | Yes | Yes | Yes | Yes | Yes |
+
+### Proposal → Commit Flow
+
+After a proposal is executed (not dry_run), the system can auto-commit if trust allows:
+1. Apply diffs (existing executor flow)
+2. If trust >= 2: `git commit -m "Lathe: <summary>"`
+3. If trust >= 3: auto-push after commit
+
+Use `auto_commit_after_execution()` from `lathe_app.executor`.
+
+### Safety Guarantees
+
+- Whitelisted git commands only (clone, pull, status, commit, push, log, init, add, etc.)
+- No `shell=True` in subprocess
+- cwd locked to workspace directory
+- Credentials redacted from all output
+- Workspace boundary checks enforced at all trust levels
 
 ## Workspace Memory Contract
 

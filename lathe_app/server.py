@@ -253,6 +253,10 @@ class AppHandler(BaseHTTPRequestHandler):
         if intent == "context" and task == "ingest_workspace":
             self.handle_workspace_ingest(body)
             return
+
+        if intent == "workspace.git":
+            self.handle_workspace_git(body)
+            return
         
         missing = []
         if not intent:
@@ -599,6 +603,109 @@ class AppHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self.send_json(make_refusal("workspace_error", str(e)))
     
+    def handle_workspace_git(self, body: Dict[str, Any]):
+        """Handle intent=workspace.git - Git operations on workspaces.
+
+        This intent is NOT handled by the kernel and MUST NOT invoke a model.
+        Supported actions: clone, pull, status, commit, push.
+        """
+        action = body.get("action")
+        workspace_name = body.get("workspace")
+        repo_url = body.get("repo")
+        branch = body.get("branch")
+        message = body.get("message")
+
+        if not action:
+            self.send_json(make_refusal("missing_fields", "Missing required field: action"), 400)
+            return
+
+        valid_actions = {"clone", "pull", "status", "commit", "push"}
+        if action not in valid_actions:
+            self.send_json(
+                make_refusal("invalid_action", f"Invalid action: {action}. Valid: {', '.join(sorted(valid_actions))}"),
+                400,
+            )
+            return
+
+        if not workspace_name:
+            self.send_json(make_refusal("missing_fields", "Missing required field: workspace"), 400)
+            return
+
+        try:
+            from lathe_app.workspace import get_default_manager
+            from lathe_app.workspace.git_workspace import GitWorkspace
+            from lathe_app.trust import TrustPolicy, evaluate_git_trust
+
+            manager = get_default_manager()
+            workspace = manager.get_workspace(workspace_name)
+
+            if workspace is None:
+                workspaces = manager.list_workspaces()
+                ws_match = None
+                for ws in workspaces:
+                    if os.path.basename(ws.root_path) == workspace_name:
+                        ws_match = ws
+                        break
+                if ws_match is None:
+                    if action == "clone":
+                        workspaces_root = os.path.expanduser("~/.lathe/workspaces")
+                        os.makedirs(workspaces_root, exist_ok=True)
+                        ws_dir = os.path.join(workspaces_root, workspace_name)
+                        os.makedirs(ws_dir, exist_ok=True)
+                        workspace = manager.create_workspace(ws_dir, workspace_id=workspace_name)
+                    else:
+                        self.send_json(make_refusal("not_found", f"Workspace not found: {workspace_name}"), 404)
+                        return
+                else:
+                    workspace = ws_match
+
+            policy = TrustPolicy.load_from_workspace(workspace.root_path)
+            trust_eval = evaluate_git_trust(policy, action, workspace_root=workspace.root_path)
+
+            if not trust_eval.allowed:
+                response = {
+                    "success": False,
+                    "operation": action,
+                    "workspace": workspace_name,
+                    "refusal_reason": trust_eval.reason,
+                    "trust_evaluation": trust_eval.to_dict(),
+                    "results": [],
+                }
+                self.send_json(response, 403)
+                return
+
+            git_ws = GitWorkspace(workspace.root_path, workspace_id=workspace_name)
+
+            if action == "clone":
+                if not repo_url:
+                    self.send_json(make_refusal("missing_fields", "Missing required field: repo for clone action"), 400)
+                    return
+                result = git_ws.clone(repo_url, branch=branch)
+            elif action == "pull":
+                result = git_ws.pull()
+            elif action == "status":
+                result = git_ws.status()
+            elif action == "commit":
+                commit_msg = message or body.get("task", "Lathe: automated commit")
+                result = git_ws.commit(commit_msg)
+            elif action == "push":
+                result = git_ws.push()
+            else:
+                self.send_json(make_refusal("invalid_action", f"Unhandled action: {action}"), 400)
+                return
+
+            response = result.to_dict()
+            response["trust_evaluation"] = trust_eval.to_dict()
+            response["results"] = []
+            status_code = 200 if result.success else 422
+            self.send_json(response, status_code)
+
+        except ValueError as e:
+            self.send_json(make_refusal("validation_error", str(e)), 400)
+        except Exception as e:
+            logger.exception("Error in workspace git operation")
+            self.send_json(make_error_response(str(e)), 500)
+
     def handle_workspace_create(self, body: Dict[str, Any]):
         """Handle POST /workspace/create - create a new workspace."""
         path = body.get("path")

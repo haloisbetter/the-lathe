@@ -239,3 +239,60 @@ def execute_from_run(
         return ExecutionResult.rejected(validation_error, workspace_id=ws_id)
     
     return executor.execute(artifact, dry_run=dry_run)
+
+
+def auto_commit_after_execution(
+    result: ExecutionResult,
+    workspace_root: str,
+    workspace_id: str,
+    run_id: str,
+    task_summary: str = "",
+) -> Optional[Dict[str, Any]]:
+    """Auto-commit changes after a successful execution, gated by trust policy.
+
+    Returns a dict describing the git operation result, or None if not applicable.
+    Only commits if:
+    - Execution was actually applied (not dry_run, not rejected)
+    - Trust policy allows commit at this trust level
+    """
+    if not result.applied:
+        return None
+
+    from lathe_app.trust import TrustPolicy, evaluate_git_trust
+    from lathe_app.workspace.git_workspace import GitWorkspace
+
+    policy = TrustPolicy.load_from_workspace(workspace_root)
+    commit_eval = evaluate_git_trust(policy, "commit", workspace_root=workspace_root)
+
+    if not commit_eval.allowed:
+        return {
+            "operation": "auto_commit",
+            "performed": False,
+            "reason": commit_eval.reason,
+            "trust_evaluation": commit_eval.to_dict(),
+        }
+
+    git_ws = GitWorkspace(workspace_root, workspace_id=workspace_id)
+    if not git_ws.is_git_repo():
+        return {
+            "operation": "auto_commit",
+            "performed": False,
+            "reason": "Workspace is not a git repository",
+        }
+
+    commit_msg = f"Lathe: {task_summary}" if task_summary else f"Lathe: applied run {run_id}"
+    commit_result = git_ws.commit(commit_msg)
+
+    auto_push = None
+    if commit_result.success:
+        push_eval = evaluate_git_trust(policy, "push", workspace_root=workspace_root)
+        if push_eval.allowed:
+            push_result = git_ws.push()
+            auto_push = push_result.to_dict()
+
+    return {
+        "operation": "auto_commit",
+        "performed": commit_result.success,
+        "commit": commit_result.to_dict(),
+        "auto_push": auto_push,
+    }
