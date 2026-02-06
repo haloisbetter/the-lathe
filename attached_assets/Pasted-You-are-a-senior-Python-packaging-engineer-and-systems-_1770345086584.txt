@@ -1,0 +1,113 @@
+You are a senior Python packaging engineer and systems architect.
+
+This is a HARDENING TASK. Treat it as such.
+
+────────────────────────────────────────
+CONTEXT
+────────────────────────────────────────
+This repository intentionally contains TWO first-class Python packages:
+
+- lathe/       → core engine
+- lathe_app/   → application / orchestration layer
+
+Both are REQUIRED.
+Both are PUBLIC.
+Both must be installable via standard Python tooling.
+
+Tests import lathe_app directly:
+    from lathe_app.executor import ...
+    from lathe_app.workspace import ...
+
+Current behavior is INVALID:
+- Tests only pass when PYTHONPATH is manually set
+- pip install -e . does NOT expose lathe_app
+- This breaks Replit, CI, clean environments, and users
+
+This is a PACKAGING DECLARATION FAILURE.
+Not a test issue.
+Not a runtime issue.
+Not a user issue.
+
+────────────────────────────────────────
+NON-NEGOTIABLE REQUIREMENTS
+────────────────────────────────────────
+
+1. FIX PACKAGING CORRECTLY
+- Update pyproject.toml using standard setuptools configuration
+- Explicitly declare BOTH packages: lathe and lathe_app
+- Do NOT merge directories
+- Do NOT modify imports
+- Do NOT rely on PYTHONPATH
+- Do NOT add runtime hacks
+
+2. VERIFY EDITABLE INSTALL
+After your changes, this MUST work in a clean venv:
+
+    pip install -e .
+    python - << 'EOF'
+    import lathe
+    import lathe_app
+    print("OK")
+    EOF
+
+No environment variables allowed.
+
+3. HARDEN AGAINST REGRESSION
+Add at least ONE automated test that fails if:
+- lathe_app is not importable after install
+- OR pyproject.toml omits required packages
+
+The test must:
+- Be fast
+- Be offline
+- NOT rely on PYTHONPATH
+
+4. PRESERVE ARCHITECTURE
+- lathe and lathe_app remain separate
+- Public APIs remain unchanged
+- Existing tests remain valid
+
+If you believe an alternative solution is superior:
+STOP.
+Explain first.
+Do not implement silently.
+
+5. VALIDATION (MANDATORY)
+You MUST run and confirm:
+
+    pip install -e .
+    pytest -q
+
+All tests must pass WITHOUT PYTHONPATH.
+
+────────────────────────────────────────
+OUTPUT FORMAT (STRICT)
+────────────────────────────────────────
+Your final response MUST include:
+
+1. Exact files changed
+2. Exact diffs OR full file replacements
+3. Clear explanation of WHY this fixes Replit specifically
+4. A confirmation checklist showing all requirements satisfied
+
+If any requirement cannot be met:
+Return a STRUCTURED REFUSAL explaining why.
+
+────────────────────────────────────────
+CONSTRAINTS
+────────────────────────────────────────
+- No prose-only answers
+- No partial fixes
+- No “works on my machine”
+- Deterministic, boring, correct
+
+────────────────────────────────────────
+SUCCESS CRITERIA
+────────────────────────────────────────
+When finished:
+- lathe_app imports work everywhere
+- Replit needs zero manual setup
+- CI == local == user environment
+- This failure mode cannot silently return
+
+Proceed.

@@ -21,8 +21,8 @@ dev = [
     "pytest-cov>=4.0",
 ]
 
-[tool.setuptools]
-packages = ["lathe"]
+[tool.setuptools.packages.find]
+include = ["lathe", "lathe.*", "lathe_app", "lathe_app.*"]
 
 [tool.setuptools.package-data]
 lathe = ["validation/schema.sql"]

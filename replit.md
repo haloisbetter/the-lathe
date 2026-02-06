@@ -42,7 +42,7 @@ lathe_app/          # Application layer (all state lives here)
     ├── context.py  # WorkspaceContext for scoping
     └── status.py   # Index status tracking
 
-tests/              # 343 tests
+tests/              # 347 tests
 ├── test_*.py       # Core Lathe tests
 └── app/            # App layer tests
 ```
