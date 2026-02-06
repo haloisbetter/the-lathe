@@ -1,0 +1,208 @@
+You are implementing FIRST-CLASS WORKSPACE INGESTION for the Lathe agent.
+
+This is NOT a UI task.
+This is NOT a demo hack.
+This is NOT a PYTHONPATH workaround.
+This is NOT a one-off repo index.
+
+This is a permanent, architecture-level feature.
+
+========================
+PRIMARY GOAL
+========================
+
+Enable Lathe to ingest, index, and reason over EXTERNAL REPOSITORIES
+without restarting the server and without changing Lathe’s own working directory.
+
+Lathe must support MULTIPLE workspaces concurrently.
+
+========================
+NON-NEGOTIABLE CONSTRAINTS
+========================
+
+- Lathe remains a long-running service (daemon)
+- Lathe codebase is NEVER modified by workspace ingestion
+- Workspaces are READ-ONLY
+- No code execution inside workspaces
+- No shell commands executed inside workspaces
+- No PYTHONPATH tricks
+- No symlinks
+- No copying files into Lathe’s repo
+- No global state pollution
+- No UI assumptions
+- No OpenWebUI-specific logic in core
+
+========================
+NEW CAPABILITY
+========================
+
+Add a new agent intent:
+
+intent: "context"
+task: "ingest_workspace"
+
+This registers an external repository as a named workspace.
+
+========================
+REQUEST CONTRACT
+========================
+
+Lathe must accept the following JSON payload via /agent:
+
+{
+  "intent": "context",
+  "task": "ingest_workspace",
+  "why": {
+    "goal": "analyze external repository",
+    "context": "external project",
+    "evidence": "<absolute path>",
+    "decision": "index",
+    "risk_level": "Low",
+    "options_considered": [],
+    "guardrails": ["read-only"],
+    "verification_steps": ["rag query"]
+  },
+  "workspace": {
+    "name": "juicer-press",
+    "root_path": "/absolute/path/to/repo",
+    "manifest": "git",
+    "include": ["**/*.py", "**/*.md"],
+    "exclude": [".venv", ".git", "node_modules", "__pycache__"]
+  }
+}
+
+========================
+EXPECTED BEHAVIOR
+========================
+
+1. Validate workspace.root_path exists
+2. Validate path is a directory
+3. Validate it is NOT inside the Lathe repo
+4. Resolve include/exclude globs
+5. Enumerate files WITHOUT executing anything
+6. Read file contents safely
+7. Index content into a WORKSPACE-SCOPED RAG index
+8. Register workspace in an internal registry
+9. Return a success response with:
+   - workspace name
+   - file count
+   - indexed extensions
+   - index status
+
+========================
+ARCHITECTURE REQUIREMENTS
+========================
+
+Create the following new subsystems (names are mandatory):
+
+lathe/workspaces/
+  __init__.py
+  registry.py        # WorkspaceRegistry
+  models.py          # Workspace dataclass
+  scanner.py         # Filesystem scanning + glob filtering
+  indexer.py         # RAG ingestion per workspace
+  errors.py          # Workspace-specific errors
+
+========================
+REGISTRY RULES
+========================
+
+WorkspaceRegistry must:
+- Store workspaces by name
+- Reject duplicate names
+- Allow lookup by name
+- Be in-memory ONLY for v1
+- Be safe to extend later to persistence
+
+========================
+RAG RULES
+========================
+
+- Each workspace has its OWN index namespace
+- RAG queries must specify workspace explicitly
+- Default workspace is NONE
+- If no workspace is selected, Lathe only uses its own docs
+
+Example follow-up query:
+
+{
+  "intent": "rag",
+  "task": "list python files",
+  "workspace": "juicer-press",
+  "why": { ... }
+}
+
+========================
+SAFETY GUARANTEES
+========================
+
+- No writes to workspace
+- No chmod
+- No git commands
+- No subprocess calls
+- No imports from workspace
+- Text-only ingestion
+
+========================
+ERROR HANDLING
+========================
+
+Raise explicit errors for:
+- Path not found
+- Path not directory
+- Workspace name collision
+- Zero files indexed
+- Include/exclude mismatch
+- Workspace outside allowed filesystem boundary
+
+========================
+TESTING (MANDATORY)
+========================
+
+Add pytest tests that verify:
+
+1. Workspace can be ingested
+2. Duplicate workspace name is rejected
+3. Files are discovered correctly
+4. Excluded paths are ignored
+5. RAG queries return workspace files
+6. Lathe repo files are NOT returned when querying workspace
+7. RAG without workspace does NOT leak workspace data
+8. Workspace ingestion is read-only enforced
+
+Tests must run with:
+pytest -q
+No environment variables
+No PYTHONPATH hacks
+
+========================
+OUT OF SCOPE (DO NOT IMPLEMENT)
+========================
+
+- UI panels
+- File watching
+- Auto-reindexing
+- Git operations
+- Code execution
+- OpenWebUI plugins
+- Persistence
+
+========================
+DELIVERABLE
+========================
+
+When complete:
+
+- Lathe server runs unchanged
+- External repos can be ingested dynamically
+- RAG correctly scopes by workspace
+- All existing tests still pass
+- New tests pass
+- Architecture remains clean
+
+Do NOT simplify.
+Do NOT skip steps.
+Do NOT guess intent.
+If something is unclear, STOP and ask.
+
+Proceed methodically.
