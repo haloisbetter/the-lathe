@@ -174,6 +174,9 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.send_json({"ok": True, "results": []})
             elif path == "/runs":
                 self.handle_runs_query(query)
+            elif path.startswith("/runs/") and path.endswith("/staleness"):
+                run_id = path.split("/")[2]
+                self.handle_staleness_check(run_id)
             elif path.startswith("/runs/") and "/review" in path:
                 run_id = path.split("/")[2]
                 self.handle_get_review(run_id)
@@ -408,7 +411,11 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json(make_refusal("ingestion_error", str(e)))
     
     def handle_workspace_ingest(self, body: Dict[str, Any]):
-        """Handle intent=context, task=ingest_workspace via POST /agent."""
+        """Handle intent=context, task=ingest_workspace via POST /agent.
+
+        Produces a WorkspaceSnapshot (manifest + stats) as the authoritative
+        record of workspace contents.  Optionally also indexes for RAG.
+        """
         ws_config = body.get("workspace")
         if not ws_config or not isinstance(ws_config, dict):
             self.send_json(
@@ -427,85 +434,61 @@ class AppHandler(BaseHTTPRequestHandler):
             return
 
         try:
-            from lathe_app.workspace.errors import (
-                WorkspaceError,
-            )
+            from lathe_app.workspace.errors import WorkspaceError
+            from lathe_app.workspace.snapshot import snapshot_workspace
+            from lathe_app.workspace.memory import load_workspace_context
             from lathe_app.workspace.registry import (
                 RegisteredWorkspace,
                 get_default_registry,
             )
-            from lathe_app.workspace.scanner import scan_workspace, collect_extensions
+            from lathe_app.workspace.scanner import collect_extensions
             from lathe_app.workspace.indexer import get_default_indexer
-            from lathe_app.workspace.manager import UNSAFE_PATHS
-            import os
             from datetime import datetime
-
-            abs_path = os.path.abspath(root_path)
-
-            for unsafe in UNSAFE_PATHS:
-                if abs_path == unsafe or abs_path.startswith(unsafe + os.sep):
-                    self.send_json(
-                        make_refusal("unsafe_path", f"Cannot ingest system directory: {unsafe}"),
-                        400
-                    )
-                    return
-
-            if not os.path.exists(abs_path):
-                self.send_json(
-                    make_refusal("path_not_found", f"Path not found: {abs_path}"),
-                    400
-                )
-                return
-
-            if not os.path.isdir(abs_path):
-                self.send_json(
-                    make_refusal("not_directory", f"Path is not a directory: {abs_path}"),
-                    400
-                )
-                return
-
-            lathe_root = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
-            if abs_path == lathe_root or abs_path.startswith(lathe_root + os.sep):
-                self.send_json(
-                    make_refusal("self_ingestion", "Cannot ingest the Lathe repository itself"),
-                    400
-                )
-                return
 
             include = ws_config.get("include")
             exclude = ws_config.get("exclude")
-            manifest = ws_config.get("manifest", "unknown")
 
-            files = scan_workspace(abs_path, include=include, exclude=exclude)
+            snapshot = snapshot_workspace(
+                root_path,
+                include=include,
+                exclude=exclude,
+            )
 
-            if not files:
-                self.send_json(
-                    make_refusal("empty_workspace", f"Zero files matched filters in: {abs_path}"),
-                    400
-                )
-                return
+            abs_path = snapshot.manifest.root_path
+            files = [
+                os.path.join(abs_path, entry.path)
+                for entry in snapshot.manifest.files
+            ]
 
-            indexer = get_default_indexer()
-            doc_count, chunk_count, errors = indexer.ingest_files(name, files, abs_path)
+            doc_count, chunk_count, errors = 0, 0, []
+            if files:
+                indexer = get_default_indexer()
+                doc_count, chunk_count, errors = indexer.ingest_files(name, files, abs_path)
 
             extensions = collect_extensions(files)
+
+            snapshot_id = f"snap-{snapshot.manifest.generated_at}"
 
             registry = get_default_registry()
             registered = RegisteredWorkspace(
                 name=name,
                 root_path=abs_path,
-                manifest=manifest,
+                manifest=snapshot_id,
                 include=include or [],
                 exclude=exclude or [],
-                file_count=len(files),
+                file_count=snapshot.stats.total_files,
                 indexed_extensions=extensions,
                 registered_at=datetime.utcnow().isoformat(),
                 indexed=True,
             )
             registry.register(registered)
 
+            ws_context = load_workspace_context(abs_path)
+
             response = {
                 "workspace": registered.to_dict(),
+                "snapshot": snapshot.to_dict(),
+                "workspace_context": ws_context,
                 "documents_indexed": doc_count,
                 "chunks_indexed": chunk_count,
                 "errors": errors,
@@ -513,10 +496,53 @@ class AppHandler(BaseHTTPRequestHandler):
             }
             self.send_json(response)
 
+        except ValueError as e:
+            self.send_json(make_refusal("validation_error", str(e)), 400)
         except WorkspaceError as e:
             self.send_json(make_refusal("workspace_error", str(e)), 400)
         except Exception as e:
             logger.exception("Error in workspace ingestion")
+            self.send_json(make_error_response(str(e)), 500)
+
+    def handle_staleness_check(self, run_id: str):
+        """Handle GET /runs/<id>/staleness - check file read staleness."""
+        try:
+            run = lathe_app.load_run(run_id)
+            if run is None:
+                self.send_json(make_refusal("not_found", f"Run {run_id} not found"), 404)
+                return
+
+            from lathe_app.workspace.memory import FileReadArtifact, check_run_staleness
+
+            file_reads = getattr(run, "file_reads", []) or []
+            if not file_reads:
+                self.send_json({
+                    "run_id": run_id,
+                    "potentially_stale": False,
+                    "stale_count": 0,
+                    "fresh_count": 0,
+                    "stale_files": [],
+                    "message": "No file reads recorded for this run",
+                    "results": [],
+                })
+                return
+
+            artifacts = [
+                FileReadArtifact(
+                    path=fr["path"],
+                    content_hash=fr["content_hash"],
+                    line_start=fr.get("line_start"),
+                    line_end=fr.get("line_end"),
+                    timestamp=fr.get("timestamp", ""),
+                )
+                for fr in file_reads
+            ]
+
+            result = check_run_staleness(artifacts)
+            result["run_id"] = run_id
+            result["results"] = []
+            self.send_json(result)
+        except Exception as e:
             self.send_json(make_error_response(str(e)), 500)
 
     def handle_run_stats(self):

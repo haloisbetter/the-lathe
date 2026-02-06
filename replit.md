@@ -46,11 +46,13 @@ lathe_app/          # Application layer (all state lives here)
     ├── registry.py # WorkspaceRegistry (by name, in-memory)
     ├── scanner.py  # Stateless filesystem scanner with glob filtering
     ├── indexer.py  # Per-workspace RAG index management
+    ├── snapshot.py # Workspace snapshot (authoritative manifest + stats)
+    ├── memory.py   # File read artifacts + staleness detection + context.md
     ├── risk.py     # Workspace risk assessment (import graph, hotspots)
     ├── errors.py   # Workspace-specific error types
     └── status.py   # Index status tracking
 
-tests/              # 440 tests
+tests/              # 500 tests
 ├── test_*.py       # Core Lathe tests
 └── app/            # App layer tests
 ```
@@ -91,6 +93,7 @@ python -m lathe.server
 | `/knowledge/ingest` | POST | Ingest documents for RAG |
 | `/workspace/list` | GET | List all workspaces |
 | `/workspace/create` | POST | Create a new workspace |
+| `/runs/<id>/staleness` | GET | Check file read staleness for a run |
 | `/runs/stats` | GET | Aggregated run statistics (by intent, model, rates) |
 | `/workspace/stats` | GET | Workspace statistics (file counts, extensions) |
 | `/health/summary` | GET | Health summary (recent errors, success rate) |
@@ -138,6 +141,47 @@ Response includes `ingested_documents`, `ingested_chunks`, `errors`, and `index_
 Creates a workspace scoped to the given path. Execution is refused outside workspace boundaries.
 
 **Workspace Isolation:** "Lathe reasons globally. The app scopes locally. Executors act only inside workspaces."
+
+## Workspace Memory Contract
+
+The Lathe implements a first-class workspace memory system that explicitly tracks what the AI knows, how it knows it, and whether that knowledge is stale.
+
+### A. Workspace Snapshot (Authoritative)
+
+Triggered via `POST /agent` with `intent: context`, `task: ingest_workspace`:
+
+```json
+{
+  "intent": "context",
+  "task": "ingest_workspace",
+  "workspace": {
+    "name": "my-project",
+    "root_path": "/path/to/repo"
+  }
+}
+```
+
+Produces two artifacts:
+- **workspace_manifest**: Per-file metadata (relative path, size, line count, extension, sha256 content hash, timestamp)
+- **workspace_stats**: Aggregate statistics (total/python/markdown file counts, extension distribution, directory depth histogram)
+
+Safety: Rejects system paths, self-ingestion, non-existent paths.
+
+### B. File Read Artifacts + Staleness Detection
+
+Every file read during reasoning produces a `FileReadArtifact` (path, content_hash, line_range, timestamp) attached to the `RunRecord.file_reads` list.
+
+Check staleness via `GET /runs/<id>/staleness` — compares stored hashes against current filesystem state. If a file changed after being read, the run is flagged as "potentially stale."
+
+This is **observability, not enforcement** — the system detects drift but does not silently reuse outdated content.
+
+### C. Persistent Workspace Memory (.lathe/context.md)
+
+An optional, human-authored file loaded automatically at session start:
+- `.lathe/context.md` (preferred) or `lathe.md` (fallback)
+- Contains project structure, invariants, trust level, architectural boundaries
+- Operator-controlled — never auto-generated or auto-summarized
+- Loaded and attached to `RunRecord.workspace_context_loaded`
 
 ## Python API (lathe_app)
 

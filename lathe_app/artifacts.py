@@ -185,6 +185,8 @@ class RunRecord:
     success: bool
     classification: Any = None  # ResultClassification
     escalation: Optional[Dict[str, Any]] = None
+    file_reads: List[Dict[str, Any]] = field(default_factory=list)
+    workspace_context_loaded: Optional[Dict[str, Any]] = None
     
     @classmethod
     def create(
@@ -196,6 +198,8 @@ class RunRecord:
         success: bool,
         classification: Any = None,
         escalation: Optional[Dict[str, Any]] = None,
+        file_reads: Optional[List[Dict[str, Any]]] = None,
+        workspace_context_loaded: Optional[Dict[str, Any]] = None,
     ) -> "RunRecord":
         return cls(
             id=_generate_id(),
@@ -207,4 +211,6 @@ class RunRecord:
             success=success,
             classification=classification,
             escalation=escalation,
+            file_reads=file_reads or [],
+            workspace_context_loaded=workspace_context_loaded,
         )

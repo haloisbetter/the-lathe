@@ -35,6 +35,7 @@ from lathe_app.artifacts import (
 from lathe_app.classification import ResultClassification
 from lathe_app.storage import Storage
 from lathe_app.workspace.context import WorkspaceContext, get_current_context
+from lathe_app.workspace.memory import load_workspace_context, create_file_read
 
 SPECULATIVE_CHEAP_MODEL = "deepseek-chat"
 SPECULATIVE_STRONG_MODEL = "gpt-4"
@@ -216,10 +217,20 @@ class Orchestrator:
             else:
                 escalation["accepted"] = False
         
+        ws_context_data = None
+        try:
+            ws_context_data = load_workspace_context(context.root_path)
+        except Exception:
+            pass
+
+        file_reads = self._extract_file_reads(result.response, context)
+
         run_record = self._build_run_record(
             input_data, result,
             classification=classification,
             escalation=escalation,
+            file_reads=file_reads,
+            workspace_context_loaded=ws_context_data,
         )
         
         if self._storage is not None:
@@ -272,12 +283,51 @@ class Orchestrator:
             return True
         return False
     
+    def _extract_file_reads(
+        self,
+        response: Dict[str, Any],
+        context: WorkspaceContext,
+    ) -> List[Dict[str, Any]]:
+        """Extract file read artifacts from pipeline response.
+
+        Scans proposals/steps for ``target`` fields that reference existing
+        files within the workspace and creates FileReadArtifacts for each.
+        """
+        import os
+        file_reads: List[Dict[str, Any]] = []
+        seen: set = set()
+
+        items = response.get("proposals", []) + response.get("steps", [])
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            target = item.get("target")
+            if not target or not isinstance(target, str):
+                continue
+            resolved = context.resolve_path(target)
+            if resolved is None:
+                continue
+            if resolved in seen:
+                continue
+            if not os.path.isfile(resolved):
+                continue
+            seen.add(resolved)
+            try:
+                art = create_file_read(resolved)
+                file_reads.append(art.to_dict())
+            except Exception:
+                pass
+
+        return file_reads
+
     def _build_run_record(
         self,
         input_data: ArtifactInput,
         result: PipelineResult,
         classification: ResultClassification = None,
         escalation: Optional[Dict[str, Any]] = None,
+        file_reads: Optional[List[Dict[str, Any]]] = None,
+        workspace_context_loaded: Optional[Dict[str, Any]] = None,
     ) -> RunRecord:
         """Build a RunRecord from pipeline result."""
         response = result.response
@@ -314,6 +364,8 @@ class Orchestrator:
             success=success,
             classification=classification,
             escalation=escalation,
+            file_reads=file_reads,
+            workspace_context_loaded=workspace_context_loaded,
         )
     
     def _build_success_artifact(

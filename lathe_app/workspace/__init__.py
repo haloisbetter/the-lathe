@@ -20,6 +20,22 @@ from lathe_app.workspace.registry import (
 )
 from lathe_app.workspace.indexer import WorkspaceIndexer, get_default_indexer
 from lathe_app.workspace.scanner import scan_workspace, collect_extensions
+from lathe_app.workspace.snapshot import (
+    WorkspaceSnapshot,
+    WorkspaceManifest,
+    FileEntry,
+    WorkspaceStats,
+    snapshot_workspace,
+)
+from lathe_app.workspace.memory import (
+    FileReadArtifact,
+    create_file_read,
+    check_staleness,
+    check_run_staleness,
+    load_workspace_context,
+    hash_file,
+    hash_content,
+)
 from lathe_app.workspace.errors import (
     WorkspaceError,
     WorkspacePathNotFoundError,
@@ -43,6 +59,18 @@ __all__ = [
     "get_default_indexer",
     "scan_workspace",
     "collect_extensions",
+    "WorkspaceSnapshot",
+    "WorkspaceManifest",
+    "FileEntry",
+    "WorkspaceStats",
+    "snapshot_workspace",
+    "FileReadArtifact",
+    "create_file_read",
+    "check_staleness",
+    "check_run_staleness",
+    "load_workspace_context",
+    "hash_file",
+    "hash_content",
     "WorkspaceError",
     "WorkspacePathNotFoundError",
     "WorkspaceNotDirectoryError",

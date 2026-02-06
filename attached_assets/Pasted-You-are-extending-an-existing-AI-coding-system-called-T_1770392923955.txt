@@ -1,0 +1,197 @@
+You are extending an existing AI coding system called **The Lathe**.
+
+This task is NOT exploratory and NOT speculative. You must follow the architecture exactly as described below.
+
+====================================
+GOAL
+====================================
+
+Implement a **first-class Workspace Memory Contract** that explicitly defines how repositories are ingested, tracked, invalidated, and reasoned about.
+
+This system must be STRICTLY BETTER than Replit’s current implicit filesystem discovery model.
+
+====================================
+ARCHITECTURAL LAW (DO NOT VIOLATE)
+====================================
+
+1. `lathe/` (the kernel) is PURE:
+   - No state
+   - No filesystem I/O
+   - No side effects
+   - No workspace awareness
+   - No persistence
+   - DO NOT MODIFY ANY FILE IN `lathe/`
+
+2. All stateful behavior belongs in `lathe_app/`
+3. Executors may act, but may not reason
+4. Reasoning remains deterministic and auditable
+5. Everything must be testable
+6. No new external dependencies (stdlib only)
+
+If any requested behavior conflicts with these laws, STOP and ask before proceeding.
+
+====================================
+BACKGROUND (CURRENT BEHAVIOR)
+====================================
+
+Right now:
+- Workspaces can be ingested
+- RAG indexing exists
+- Workspace scanning is stateless and read-only
+- There is NO durable, inspectable contract describing:
+  - What files exist
+  - What was read
+  - Whether context is stale
+  - What the AI is reasoning from
+
+Replit’s current model is:
+- Files are discovered implicitly
+- Only `replit.md` is auto-loaded
+- Reads can go stale without detection
+- No authoritative workspace snapshot exists
+
+We are FIXING this.
+
+====================================
+WHAT YOU MUST BUILD
+====================================
+
+Implement a **First-Class Workspace Memory Contract** with THREE CORE COMPONENTS.
+
+------------------------------------
+A. WORKSPACE SNAPSHOT (AUTHORITATIVE)
+------------------------------------
+
+Add a new workspace ingestion phase that produces an immutable snapshot artifact.
+
+New intent:
+- `intent: context`
+- `task: ingest_workspace`
+
+This MUST produce artifacts:
+
+1. `workspace_manifest.json`
+   - Absolute root path
+   - Relative file paths
+   - File size (bytes)
+   - Line count
+   - Extension
+   - Content hash (sha256)
+   - Generated timestamp
+
+2. `workspace_stats.json`
+   - Total file count
+   - Python file count
+   - Markdown file count
+   - Extension distribution
+   - Directory depth histogram
+
+Rules:
+- Read-only filesystem access
+- No code execution
+- No imports from scanned files
+- Reject system paths (/etc, /usr, /bin, etc.)
+- Reject self-ingestion (Lathe cannot ingest itself)
+
+------------------------------------
+B. FILE READ ARTIFACTS + INVALIDATION
+------------------------------------
+
+Every time a file is read for reasoning:
+
+- Generate a **FileReadArtifact** containing:
+  - path
+  - content hash
+  - line range
+  - timestamp
+
+- Attach this artifact to the RunRecord
+
+If a file is modified after being read:
+- Hash mismatch must be detectable
+- The system must flag the run as **potentially stale**
+- NO silent reuse of outdated content
+
+This is observability, NOT enforcement.
+
+------------------------------------
+C. PERSISTENT WORKSPACE MEMORY FILE
+------------------------------------
+
+Introduce a single, optional, human-authored file:
+
+- `.lathe/context.md` (or `lathe.md` if simpler)
+
+This file is:
+- Automatically loaded at session start
+- Treated as durable workspace memory
+- Equivalent to Replit’s `replit.md`, but explicit and optional
+
+Intended contents:
+- Project structure explanation
+- Invariants
+- Trust level
+- “Do not touch” rules
+- Architectural boundaries
+
+Do NOT auto-summarize the repo.
+Do NOT auto-generate this file.
+It is operator-controlled memory.
+
+====================================
+IMPLEMENTATION CONSTRAINTS
+====================================
+
+- All new code must live under `lathe_app/workspace/`
+- Kernel remains untouched
+- Snapshots are artifacts, not global state
+- Hashing uses hashlib (sha256)
+- No embeddings required
+- No indexing required
+- No background processes
+
+====================================
+TESTING REQUIREMENTS
+====================================
+
+You MUST add comprehensive tests that verify:
+
+1. Workspace snapshot creation is deterministic
+2. File hashes change when files change
+3. Snapshot rejects unsafe paths
+4. FileReadArtifacts are attached to RunRecords
+5. Stale reads are detectable
+6. `.lathe/context.md` is loaded when present
+7. Kernel files remain unmodified
+
+Tests must fail if:
+- Filesystem writes occur
+- Kernel is touched
+- Hashes are skipped
+- Workspace boundaries are violated
+
+====================================
+DELIVERABLES
+====================================
+
+1. New workspace snapshot + memory modules
+2. Updated server handlers for `intent: context`
+3. Updated RunRecord artifacts
+4. Full test suite
+5. Updated documentation explaining the Workspace Memory Contract
+
+====================================
+FINAL CHECK
+====================================
+
+Before finishing, explicitly verify and state:
+
+- Kernel untouched
+- Tests pass
+- Server runs
+- Workspace memory is inspectable and explicit
+- No implicit filesystem magic remains
+
+If anything is unclear, STOP and ask.
+
+Begin implementation.
