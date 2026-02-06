@@ -235,11 +235,15 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json(make_error_response(str(e)), 500)
     
     def handle_agent(self, body: Dict[str, Any]):
-        """Handle POST /agent - create a new run."""
+        """Handle POST /agent - create a new run or process context intent."""
         intent = body.get("intent")
         task = body.get("task")
         why = body.get("why")
         model = body.get("model")
+        
+        if intent == "context" and task == "ingest_workspace":
+            self.handle_workspace_ingest(body)
+            return
         
         missing = []
         if not intent:
@@ -397,6 +401,118 @@ class AppHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self.send_json(make_refusal("ingestion_error", str(e)))
     
+    def handle_workspace_ingest(self, body: Dict[str, Any]):
+        """Handle intent=context, task=ingest_workspace via POST /agent."""
+        ws_config = body.get("workspace")
+        if not ws_config or not isinstance(ws_config, dict):
+            self.send_json(
+                make_refusal("missing_fields", "Missing required field: workspace"),
+                400
+            )
+            return
+
+        name = ws_config.get("name")
+        root_path = ws_config.get("root_path")
+        if not name or not root_path:
+            self.send_json(
+                make_refusal("missing_fields", "workspace requires 'name' and 'root_path'"),
+                400
+            )
+            return
+
+        try:
+            from lathe_app.workspace.errors import (
+                WorkspaceError,
+            )
+            from lathe_app.workspace.registry import (
+                RegisteredWorkspace,
+                get_default_registry,
+            )
+            from lathe_app.workspace.scanner import scan_workspace, collect_extensions
+            from lathe_app.workspace.indexer import get_default_indexer
+            from lathe_app.workspace.manager import UNSAFE_PATHS
+            import os
+            from datetime import datetime
+
+            abs_path = os.path.abspath(root_path)
+
+            for unsafe in UNSAFE_PATHS:
+                if abs_path == unsafe or abs_path.startswith(unsafe + os.sep):
+                    self.send_json(
+                        make_refusal("unsafe_path", f"Cannot ingest system directory: {unsafe}"),
+                        400
+                    )
+                    return
+
+            if not os.path.exists(abs_path):
+                self.send_json(
+                    make_refusal("path_not_found", f"Path not found: {abs_path}"),
+                    400
+                )
+                return
+
+            if not os.path.isdir(abs_path):
+                self.send_json(
+                    make_refusal("not_directory", f"Path is not a directory: {abs_path}"),
+                    400
+                )
+                return
+
+            lathe_root = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
+            if abs_path == lathe_root or abs_path.startswith(lathe_root + os.sep):
+                self.send_json(
+                    make_refusal("self_ingestion", "Cannot ingest the Lathe repository itself"),
+                    400
+                )
+                return
+
+            include = ws_config.get("include")
+            exclude = ws_config.get("exclude")
+            manifest = ws_config.get("manifest", "unknown")
+
+            files = scan_workspace(abs_path, include=include, exclude=exclude)
+
+            if not files:
+                self.send_json(
+                    make_refusal("empty_workspace", f"Zero files matched filters in: {abs_path}"),
+                    400
+                )
+                return
+
+            indexer = get_default_indexer()
+            doc_count, chunk_count, errors = indexer.ingest_files(name, files, abs_path)
+
+            extensions = collect_extensions(files)
+
+            registry = get_default_registry()
+            registered = RegisteredWorkspace(
+                name=name,
+                root_path=abs_path,
+                manifest=manifest,
+                include=include or [],
+                exclude=exclude or [],
+                file_count=len(files),
+                indexed_extensions=extensions,
+                registered_at=datetime.utcnow().isoformat(),
+                indexed=True,
+            )
+            registry.register(registered)
+
+            response = {
+                "workspace": registered.to_dict(),
+                "documents_indexed": doc_count,
+                "chunks_indexed": chunk_count,
+                "errors": errors,
+                "results": [],
+            }
+            self.send_json(response)
+
+        except WorkspaceError as e:
+            self.send_json(make_refusal("workspace_error", str(e)), 400)
+        except Exception as e:
+            logger.exception("Error in workspace ingestion")
+            self.send_json(make_error_response(str(e)), 500)
+
     def handle_workspace_list(self):
         """Handle GET /workspace/list - list all workspaces."""
         try:

@@ -1,0 +1,114 @@
+SYSTEM ROLE
+You are working inside the Lathe codebase.
+You MUST respect existing architectural laws.
+If a requirement conflicts with architecture, STOP and adapt the placement — do NOT silently violate design constraints.
+
+PROJECT CONTEXT
+Lathe has a strict kernel/app boundary:
+
+- `lathe/` is a PURE KERNEL
+  - No state
+  - No I/O
+  - No filesystem access
+  - No registries
+  - No side effects
+  - Deterministic, testable, portable
+
+- `lathe_app/` is the STATEFUL APPLICATION LAYER
+  - Owns filesystem access
+  - Owns registries
+  - Owns RAG indexes
+  - Owns workspace lifecycle
+  - Owns environment coupling
+
+This boundary is NON-NEGOTIABLE.
+
+GOAL
+Add the ability to ingest and index external repositories as workspaces so the Lathe agent can reason over them using RAG — WITHOUT violating kernel purity.
+
+ARCHITECTURAL DECISION (LOCKED)
+You MUST implement Option B.
+
+- DO NOT create `lathe/workspaces/`
+- DO NOT add state to `lathe/`
+- DO NOT duplicate workspace systems
+
+Instead:
+- Extend the EXISTING workspace system under `lathe_app/workspace/`
+
+This preserves all architectural laws while delivering identical external behavior.
+
+TARGET ARCHITECTURE (LOCKED)
+
+lathe/                       # PURE KERNEL (UNCHANGED)
+├─ normalize.py
+├─ pipeline.py
+├─ output_validator.py
+├─ model_tiers.py
+
+lathe_app/workspace/         # STATEFUL BOUNDARY (EXTENDED)
+├─ __init__.py
+├─ models.py                 # Extend existing Workspace dataclass
+├─ registry.py               # WorkspaceRegistry (in-memory, stateful)
+├─ scanner.py                # Filesystem scanner (stateless)
+├─ indexer.py                # RAG ingestion + index ownership (stateful)
+├─ manager.py                # Workspace lifecycle orchestration
+├─ context.py                # Execution context binding
+├─ errors.py                 # Workspace-specific errors
+
+REQUIRED BEHAVIOR
+- Allow ingestion of an external repository via an agent intent
+- Index only allowed file types (e.g. .py, .md)
+- Respect include / exclude globs
+- Maintain isolation between workspaces
+- RAG queries MUST be scoped to the active workspace
+- Workspace state MUST live in-memory only
+- No execution of indexed code
+- Read-only guarantees enforced
+
+API CONTRACT (MUST NOT CHANGE)
+The agent interface remains the same. Example:
+
+POST /agent
+{
+  "intent": "context",
+  "task": "ingest_workspace",
+  "workspace": {
+    "root_path": "/path/to/repo",
+    "manifest": "git",
+    "include": ["**/*.py", "**/*.md"],
+    "exclude": [".venv", "node_modules", ".git"]
+  },
+  "why": {
+    "goal": "analyze external repository",
+    "decision": "index",
+    "risk_level": "Low",
+    "guardrails": ["read-only", "no execution"]
+  }
+}
+
+IMPLEMENTATION RULES
+- Scanner MUST be stateless and pure
+- Registry and indexer MAY hold in-memory state
+- Kernel code MUST NOT import application state
+- No global mutable state
+- No environment variables required
+- No filesystem writes outside controlled index storage
+- Existing APIs and tests MUST continue to pass
+
+DELIVERABLES
+1. Workspace ingestion implementation under `lathe_app/workspace/`
+2. Registry to track active workspaces
+3. Indexer that builds and scopes RAG indexes per workspace
+4. Manager orchestration wiring
+5. Clear error handling for invalid paths or permissions
+6. Tests validating:
+   - Kernel purity remains intact
+   - Workspace isolation
+   - RAG scoping correctness
+   - No PYTHONPATH hacks required
+
+FINAL CHECK
+If at any point a change would introduce state, I/O, or side effects into `lathe/`, STOP and refactor into `lathe_app/` instead.
+
+Proceed only after confirming compliance with this architecture.

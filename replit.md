@@ -36,13 +36,17 @@ lathe_app/          # Application layer (all state lives here)
 │   ├── ingest.py   # File ingestion with chunking
 │   ├── index.py    # In-memory vector index
 │   └── status.py   # Index status tracking
-└── workspace/      # Workspace isolation for multi-project safety
+└── workspace/      # Workspace isolation + external repo ingestion
     ├── models.py   # Workspace dataclass
     ├── manager.py  # WorkspaceManager with path safety
     ├── context.py  # WorkspaceContext for scoping
+    ├── registry.py # WorkspaceRegistry (by name, in-memory)
+    ├── scanner.py  # Stateless filesystem scanner with glob filtering
+    ├── indexer.py  # Per-workspace RAG index management
+    ├── errors.py   # Workspace-specific error types
     └── status.py   # Index status tracking
 
-tests/              # 347 tests
+tests/              # 376 tests
 ├── test_*.py       # Core Lathe tests
 └── app/            # App layer tests
 ```
