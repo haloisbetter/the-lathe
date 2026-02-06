@@ -19,7 +19,14 @@ Speculative Model Selection:
 - For propose/think intents, tries cheap model first
 - Escalates to stronger model if validator rejects or warnings exceed threshold
 - All escalation decisions are logged in RunRecord.escalation
+
+Context Echo Validation:
+- After model output, before classification/execution
+- Wraps agent_fn to intercept raw text and validate Context Echo Block
+- On failure, produces structured refusal (no retries, no escalation)
+- Kernel remains untouched
 """
+import json as _json
 from typing import Any, Callable, Dict, List, Optional
 
 from lathe.pipeline import process_request, PipelineResult
@@ -34,6 +41,7 @@ from lathe_app.artifacts import (
 )
 from lathe_app.classification import ResultClassification
 from lathe_app.storage import Storage
+from lathe_app.validation.context_echo import validate_context_echo
 from lathe_app.workspace.context import WorkspaceContext, get_current_context
 from lathe_app.workspace.memory import load_workspace_context, create_file_read
 
@@ -108,6 +116,7 @@ class Orchestrator:
         self,
         agent_fn: Callable = None,
         storage: Storage = None,
+        require_context_echo: bool = False,
     ):
         """
         Initialize orchestrator.
@@ -117,9 +126,13 @@ class Orchestrator:
                       Signature: (normalized, model_id) -> str
             storage: Optional storage backend for persisting runs.
                      If None, runs are not persisted.
+            require_context_echo: If True, validate Context Echo Block
+                                  in every model response.
         """
         self._agent_fn = agent_fn or _default_agent_fn
         self._storage = storage
+        self._require_context_echo = require_context_echo
+        self._last_echo_result = None
     
     def execute(
         self,
@@ -171,10 +184,14 @@ class Orchestrator:
             "why": why,
         }
         
+        effective_agent_fn = self._agent_fn
+        if self._require_context_echo:
+            effective_agent_fn = self._wrap_with_echo_validation(self._agent_fn)
+        
         result = process_request(
             payload=payload,
             model_id=model_id,
-            agent_fn=self._agent_fn,
+            agent_fn=effective_agent_fn,
             allow_fallback=True,
             require_fingerprint=True,
             enable_observability=True,
@@ -199,7 +216,7 @@ class Orchestrator:
             strong_result = process_request(
                 payload=payload,
                 model_id=SPECULATIVE_STRONG_MODEL,
-                agent_fn=self._agent_fn,
+                agent_fn=effective_agent_fn,
                 allow_fallback=True,
                 require_fingerprint=True,
                 enable_observability=True,
@@ -397,6 +414,30 @@ class Orchestrator:
                 observability=observability,
             )
     
+    def _wrap_with_echo_validation(self, agent_fn: Callable) -> Callable:
+        """Wrap agent_fn to validate Context Echo Block before kernel processing.
+
+        If the raw response text fails echo validation, returns a structured
+        refusal JSON string so the kernel treats it as a normal refusal.
+        The original agent_fn and kernel remain untouched.
+        """
+        def wrapped(normalized, model_id: str) -> str:
+            raw = agent_fn(normalized, model_id)
+            echo_result = validate_context_echo(raw)
+            self._last_echo_result = echo_result
+
+            if not echo_result.valid:
+                return _json.dumps({
+                    "refusal": True,
+                    "reason": "Context Echo validation failed",
+                    "details": _json.dumps(echo_result.why()),
+                    "results": [],
+                    "context_echo_violations": echo_result.why(),
+                })
+            return raw
+
+        return wrapped
+
     def _get_workspace_context(self, workspace_id: str = None) -> WorkspaceContext:
         """
         Get workspace context for a request.

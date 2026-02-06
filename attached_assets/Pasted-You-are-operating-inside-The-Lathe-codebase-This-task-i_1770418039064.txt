@@ -1,0 +1,144 @@
+You are operating inside The Lathe codebase.
+
+This task is ARCHITECTURALLY SENSITIVE.
+Do not proceed unless all constraints below are respected.
+
+========================
+NON-NEGOTIABLE CONSTRAINTS
+========================
+
+1. The `lathe/` package is PURE and STATELESS.
+   - No filesystem writes
+   - No subprocess calls
+   - No registries, caches, or side effects
+   - DO NOT MODIFY ANY FILE UNDER `lathe/`
+
+2. All new logic MUST live in `lathe_app/`.
+
+3. Enforcement must be:
+   - Deterministic
+   - Testable
+   - Observable
+   - Vendor-agnostic (must work with Replit, OpenWebUI, Bolt, Cursor)
+
+4. Do NOT invent new abstractions unless strictly necessary.
+   Prefer extending existing patterns.
+
+========================
+OBJECTIVE
+========================
+
+Implement a **Lathe Agent Contract** and **Context Echo Validation** with the following phases:
+
+PHASE 1 — Canonical Contract (NO enforcement yet)
+PHASE 2 — Deterministic Context Echo Validation
+PHASE 3 — Clean wiring into the server/orchestrator
+PHASE 4 — Comprehensive tests
+
+========================
+PHASE 1 — AGENT CONTRACT (READ-ONLY)
+========================
+
+1. Add a new file:
+
+   lathe_app/contracts/agent_contract.md
+
+2. Store the provided Agent Contract verbatim.
+   - No templating
+   - No runtime mutation
+   - This file is canonical and read-only
+
+3. Add a short header comment stating:
+   “This document defines the mandatory behavioral contract for all agents operating under Lathe control.”
+
+No logic is added in this phase.
+
+========================
+PHASE 2 — CONTEXT ECHO VALIDATION
+========================
+
+Implement deterministic validation with the following rules ONLY:
+
+REQUIRED BLOCK:
+The model response MUST include:
+
+--- CONTEXT_ECHO_START ---
+Workspace: <name>
+Snapshot: <snapshot-id>
+Files:
+- <path>
+- <path>
+--- CONTEXT_ECHO_END ---
+
+VALIDATION RULES:
+1. The block MUST exist.
+2. The fields Workspace, Snapshot, and Files MUST exist.
+3. Any file path referenced elsewhere in the response MUST be present in Files.
+4. If validation fails:
+   - Reject the response
+   - Return a refusal
+   - Attach a WHY record explaining the violation
+
+NO semantic judgment.
+NO retries.
+NO reframing.
+NO model escalation.
+
+This is structural validation only.
+
+========================
+PHASE 3 — ARCHITECTURAL WIRING
+========================
+
+Insert validation at the correct point:
+
+model_output
+   ↓
+context_echo_validator   ← NEW
+   ↓
+output_validator
+   ↓
+review / execution
+
+Implementation guidance:
+- Create a small validator module (e.g. `lathe_app/validation/context_echo.py`)
+- Wire it into the orchestrator AFTER model output, BEFORE execution
+- On failure, return a structured refusal
+
+========================
+PHASE 4 — TESTING (REQUIRED)
+========================
+
+Add tests that prove:
+
+1. Response WITHOUT Context Echo is rejected
+2. Response WITH malformed Context Echo is rejected
+3. Response referencing files not in echo is rejected
+4. Valid Context Echo passes
+5. Kernel remains untouched
+
+Tests must be deterministic.
+Mock model output where needed.
+
+========================
+DELIVERABLES
+========================
+
+- agent_contract.md stored verbatim
+- Context Echo validator
+- Orchestrator/server wiring
+- Tests proving enforcement
+- Zero changes to `lathe/`
+
+========================
+SUCCESS CRITERIA
+========================
+
+- Kernel remains pure
+- Enforcement is deterministic
+- Hallucinated file references are impossible to execute
+- System works identically across Replit, OpenWebUI, Bolt, and Cursor
+
+Proceed step-by-step.
+Do not skip tests.
+Do not weaken constraints.

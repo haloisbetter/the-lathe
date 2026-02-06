@@ -34,6 +34,10 @@ lathe_app/          # Application layer (all state lives here)
 ├── executor.py     # PatchExecutor for applying proposals + auto_commit_after_execution
 ├── http_serialization.py  # JSON serialization
 ├── server.py       # HTTP server for OpenWebUI
+├── contracts/      # Canonical agent contracts (read-only)
+│   └── agent_contract.md  # Mandatory behavioral contract for all agents
+├── validation/     # Structural validators for agent responses
+│   └── context_echo.py    # Context Echo Block validator (deterministic)
 ├── knowledge/      # Knowledge ingestion for RAG
 │   ├── models.py   # Document, Chunk, KnowledgeIndexStatus
 │   ├── ingest.py   # File ingestion with chunking
@@ -53,7 +57,7 @@ lathe_app/          # Application layer (all state lives here)
     ├── errors.py   # Workspace-specific error types
     └── status.py   # Index status tracking
 
-tests/              # 561 tests
+tests/              # 589 tests
 ├── test_*.py       # Core Lathe tests
 └── app/            # App layer tests
 ```
@@ -191,6 +195,44 @@ Use `auto_commit_after_execution()` from `lathe_app.executor`.
 - cwd locked to workspace directory
 - Credentials redacted from all output
 - Workspace boundary checks enforced at all trust levels
+
+## Agent Contract & Context Echo Validation
+
+The Lathe enforces a mandatory Agent Contract on all executor agents. The contract is stored canonically at `lathe_app/contracts/agent_contract.md` (read-only, never mutated at runtime).
+
+### Context Echo Block
+
+Every agent response MUST include a Context Echo Block declaring what context it has access to:
+
+```
+--- CONTEXT_ECHO_START ---
+Workspace: <name or NONE>
+Snapshot: <id or NONE>
+Files:
+- path/to/file.py
+- path/to/file2.md
+--- CONTEXT_ECHO_END ---
+```
+
+### Deterministic Validation
+
+The validator (`lathe_app/validation/context_echo.py`) enforces three structural rules:
+
+1. **Block must exist** — delimited by `CONTEXT_ECHO_START` / `CONTEXT_ECHO_END`
+2. **Required fields** — Workspace, Snapshot, Files must all be present
+3. **No undeclared file references** — any file path referenced in reasoning must appear in the Files list
+
+On failure: structured refusal with WHY record. No retries, no reframing, no model escalation.
+
+### Orchestrator Wiring
+
+Enable via `Orchestrator(require_context_echo=True)`. The validator wraps the agent_fn to intercept raw model output before kernel processing:
+
+```
+model_output → context_echo_validator → kernel output_validator → classification → execution
+```
+
+If validation fails, a structured refusal flows through the normal pipeline. The kernel remains untouched.
 
 ## Workspace Memory Contract
 
