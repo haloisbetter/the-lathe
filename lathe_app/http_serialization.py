@@ -8,7 +8,7 @@ from pathlib import Path
 from typing import Any, Dict
 from enum import Enum
 
-from lathe_app.artifacts import RunRecord
+from lathe_app.artifacts import RunRecord, ToolCallTrace
 from lathe_app.executor import ExecutionResult, ExecutionStatus
 
 
@@ -36,10 +36,16 @@ def to_jsonable_runrecord(run: RunRecord) -> Dict[str, Any]:
     Serialize a RunRecord to a JSON-safe dictionary.
     
     Always includes "results": [] for OpenWebUI compatibility.
+    Tool calls are serialized as trace dicts (summaries only, no raw output).
     """
     data = _make_jsonable(run)
     if "results" not in data:
         data["results"] = []
+    if "tool_calls" in data:
+        data["tool_calls"] = [
+            tc.to_trace_dict() if isinstance(tc, ToolCallTrace) else tc
+            for tc in (run.tool_calls or [])
+        ]
     return data
 
 

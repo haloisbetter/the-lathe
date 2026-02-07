@@ -25,6 +25,13 @@ Context Echo Validation:
 - Wraps agent_fn to intercept raw text and validate Context Echo Block
 - On failure, produces structured refusal (no retries, no escalation)
 - Kernel remains untouched
+
+Tool Execution Contract (2-phase agent flow):
+- Phase 1: Agent reasons, may emit tool_request in output
+- Tool Phase: App validates, executes, records ToolCallTrace
+- Phase 2: Agent re-invoked with TOOL_CONTEXT block injected
+- Failure modes: nonexistent tool / invalid inputs / trust denied → refusal trace
+- NO retries, NO silent fallback, NO alternative tool substitution
 """
 import json as _json
 from typing import Any, Callable, Dict, List, Optional
@@ -38,12 +45,19 @@ from lathe_app.artifacts import (
     RefusalArtifact,
     ProposalArtifact,
     PlanArtifact,
+    ToolCallTrace,
 )
 from lathe_app.classification import ResultClassification
 from lathe_app.storage import Storage
 from lathe_app.validation.context_echo import validate_context_echo
 from lathe_app.workspace.context import WorkspaceContext, get_current_context
 from lathe_app.workspace.memory import load_workspace_context, create_file_read
+from lathe_app.tools.requests import extract_and_validate
+from lathe_app.tools.execution import (
+    execute_tool,
+    execute_tool_from_error,
+    build_tool_context_block,
+)
 
 SPECULATIVE_CHEAP_MODEL = "deepseek-chat"
 SPECULATIVE_STRONG_MODEL = "gpt-4"
@@ -188,13 +202,21 @@ class Orchestrator:
         if self._require_context_echo:
             effective_agent_fn = self._wrap_with_echo_validation(self._agent_fn)
         
+        self._captured_raw_output = None
+        wrapped_fn = self._wrap_to_capture_raw(effective_agent_fn)
+        
         result = process_request(
             payload=payload,
             model_id=model_id,
-            agent_fn=effective_agent_fn,
+            agent_fn=wrapped_fn,
             allow_fallback=True,
             require_fingerprint=True,
             enable_observability=True,
+        )
+        
+        tool_calls: List[ToolCallTrace] = []
+        result, tool_calls = self._handle_tool_phase(
+            result, payload, model_id, effective_agent_fn, tool_calls,
         )
         
         escalation = None
@@ -248,6 +270,7 @@ class Orchestrator:
             escalation=escalation,
             file_reads=file_reads,
             workspace_context_loaded=ws_context_data,
+            tool_calls=tool_calls,
         )
         
         if self._storage is not None:
@@ -337,6 +360,68 @@ class Orchestrator:
 
         return file_reads
 
+    def _wrap_to_capture_raw(self, agent_fn: Callable) -> Callable:
+        """Wrap agent_fn to capture raw output before kernel processing.
+
+        The raw text is stored on self._captured_raw_output so the tool phase
+        can parse tool_request from it (the kernel may strip unknown keys).
+        """
+        def wrapped(normalized, model_id: str) -> str:
+            raw = agent_fn(normalized, model_id)
+            self._captured_raw_output = raw
+            return raw
+        return wrapped
+
+    def _handle_tool_phase(
+        self,
+        phase1_result: PipelineResult,
+        payload: Dict[str, Any],
+        model_id: str,
+        agent_fn: Callable,
+        tool_calls: List[ToolCallTrace],
+    ) -> tuple:
+        """Execute the tool phase between agent Phase 1 and Phase 2.
+
+        1. Parse tool_request from Phase 1 raw agent output (captured before kernel)
+        2. Validate the request
+        3. Execute the tool (or record refusal)
+        4. Inject TOOL_CONTEXT into Phase 2 agent call
+        5. Return the final result and accumulated tool_calls
+
+        If no tool_request is present, returns Phase 1 result unchanged.
+        """
+        raw_agent_text = getattr(self, "_captured_raw_output", None) or ""
+
+        tool_request, error = extract_and_validate(raw_agent_text)
+
+        if tool_request is None and error is None:
+            return phase1_result, tool_calls
+
+        if error is not None:
+            trace = execute_tool_from_error(error)
+            tool_calls.append(trace)
+            return phase1_result, tool_calls
+
+        trace = execute_tool(tool_request)
+        tool_calls.append(trace)
+
+        context_block = build_tool_context_block(trace)
+
+        phase2_payload = dict(payload)
+        phase2_task = phase2_payload.get("task", "")
+        phase2_payload["task"] = f"{phase2_task}\n\n{context_block}"
+
+        phase2_result = process_request(
+            payload=phase2_payload,
+            model_id=model_id,
+            agent_fn=agent_fn,
+            allow_fallback=True,
+            require_fingerprint=True,
+            enable_observability=True,
+        )
+
+        return phase2_result, tool_calls
+
     def _build_run_record(
         self,
         input_data: ArtifactInput,
@@ -345,6 +430,7 @@ class Orchestrator:
         escalation: Optional[Dict[str, Any]] = None,
         file_reads: Optional[List[Dict[str, Any]]] = None,
         workspace_context_loaded: Optional[Dict[str, Any]] = None,
+        tool_calls: Optional[List[ToolCallTrace]] = None,
     ) -> RunRecord:
         """Build a RunRecord from pipeline result."""
         response = result.response
@@ -383,6 +469,7 @@ class Orchestrator:
             escalation=escalation,
             file_reads=file_reads,
             workspace_context_loaded=workspace_context_loaded,
+            tool_calls=tool_calls,
         )
     
     def _build_success_artifact(

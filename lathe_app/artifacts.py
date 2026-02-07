@@ -169,6 +169,56 @@ class PlanArtifact:
 
 
 @dataclass
+class ToolCallTrace:
+    """
+    Immutable record of a single tool execution.
+
+    Appended to RunRecord.tool_calls after each tool phase.
+    Full raw output is stored internally; only summaries appear
+    in the trace visible to agents and the TUI.
+    """
+    tool_id: str
+    timestamp: str
+    inputs: Dict[str, Any]
+    result_summary: Dict[str, Any]
+    status: str  # "success" | "refused" | "error"
+    raw_result: Optional[Dict[str, Any]] = None
+    refusal_reason: Optional[str] = None
+
+    @classmethod
+    def create(
+        cls,
+        tool_id: str,
+        inputs: Dict[str, Any],
+        result_summary: Dict[str, Any],
+        status: str,
+        raw_result: Optional[Dict[str, Any]] = None,
+        refusal_reason: Optional[str] = None,
+    ) -> "ToolCallTrace":
+        return cls(
+            tool_id=tool_id,
+            timestamp=_now(),
+            inputs=inputs,
+            result_summary=result_summary,
+            status=status,
+            raw_result=raw_result,
+            refusal_reason=refusal_reason,
+        )
+
+    def to_trace_dict(self) -> Dict[str, Any]:
+        d: Dict[str, Any] = {
+            "tool_id": self.tool_id,
+            "timestamp": self.timestamp,
+            "inputs": self.inputs,
+            "result_summary": self.result_summary,
+            "status": self.status,
+        }
+        if self.refusal_reason is not None:
+            d["refusal_reason"] = self.refusal_reason
+        return d
+
+
+@dataclass
 class RunRecord:
     """
     Complete record of a single orchestrator execution.
@@ -187,6 +237,7 @@ class RunRecord:
     escalation: Optional[Dict[str, Any]] = None
     file_reads: List[Dict[str, Any]] = field(default_factory=list)
     workspace_context_loaded: Optional[Dict[str, Any]] = None
+    tool_calls: List[ToolCallTrace] = field(default_factory=list)
     
     @classmethod
     def create(
@@ -200,6 +251,7 @@ class RunRecord:
         escalation: Optional[Dict[str, Any]] = None,
         file_reads: Optional[List[Dict[str, Any]]] = None,
         workspace_context_loaded: Optional[Dict[str, Any]] = None,
+        tool_calls: Optional[List["ToolCallTrace"]] = None,
     ) -> "RunRecord":
         return cls(
             id=_generate_id(),
@@ -213,4 +265,5 @@ class RunRecord:
             escalation=escalation,
             file_reads=file_reads or [],
             workspace_context_loaded=workspace_context_loaded,
+            tool_calls=tool_calls or [],
         )

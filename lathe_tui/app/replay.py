@@ -200,6 +200,31 @@ class RunDetailPanel(VerticalScroll):
                 for f in touched[:30]:
                     self.mount(Static(f"  • {f}"))
 
+        tool_calls = run.get("tool_calls", [])
+        if tool_calls:
+            self.mount(Rule())
+            self.mount(Static("[bold #3AA99F]━━━ TOOL CALLS ━━━[/]", markup=True))
+            for i, tc in enumerate(tool_calls):
+                tool_id = tc.get("tool_id", "?")
+                status = tc.get("status", "?")
+                ts = format_timestamp(tc.get("timestamp", ""))
+                status_color = "#879A39" if status == "success" else "#D14D41" if status == "refused" else "#D0A215"
+                self.mount(Static(
+                    f"  [{i+1}] [{status_color}]{status}[/]  {tool_id}  ({ts})",
+                    markup=True,
+                ))
+                inputs = tc.get("inputs", {})
+                if inputs:
+                    for k, v in inputs.items():
+                        self.mount(Static(f"      input.{k}: {v}"))
+                summary = tc.get("result_summary", {})
+                if summary:
+                    for k, v in summary.items():
+                        self.mount(Static(f"      result.{k}: {v}"))
+                refusal = tc.get("refusal_reason")
+                if refusal:
+                    self.mount(Static(f"      [#D14D41]reason: {refusal}[/]", markup=True))
+
         file_reads = run.get("file_reads", [])
         if file_reads:
             self.mount(Rule())

@@ -1,0 +1,201 @@
+You are implementing tooling inside **The Lathe**.
+
+This is a CONTROL SYSTEM, not a chatbot.
+All behavior is governed by the contracts below.
+
+DO NOT modify the kernel (`lathe/`).
+All work happens in the app layer (`lathe_app/`).
+
+=====================================================
+ARCHITECTURAL LAW (NON-NEGOTIABLE)
+=====================================================
+
+Lathe reasons.
+The app decides.
+Tools act.
+Models explain.
+The TUI observes.
+
+Corollaries:
+- Models NEVER access filesystem, git, or system state
+- Tools NEVER call models
+- The kernel is NEVER modified
+- Agents NEVER fabricate tool output
+- All tool usage is explicit, logged, and replayable
+
+=====================================================
+PART 1 — TOOL SELECTION CONTRACT
+=====================================================
+
+Purpose:
+Allow agents to DECLARE the need for tools without executing them.
+
+Rules:
+1. Agents DO NOT execute tools
+2. Agents DO NOT fabricate tool results
+3. Agents MAY request tools explicitly
+4. Tool requests are declarative, not imperative
+
+When an agent requires a tool, it MUST emit EXACTLY this structure:
+
+{
+  "tool_request": {
+    "tool_id": "fs_tree",
+    "reason": "Need to enumerate Python files in the workspace",
+    "inputs": {
+      "workspace": "lathe-self-test",
+      "ext": ".py"
+    }
+  }
+}
+
+Rules:
+- tool_id MUST exist in GET /tools
+- inputs MUST match the tool schema exactly
+- If no tool is needed, tool_request MUST be omitted
+- The agent MUST NOT assume the tool’s output
+
+=====================================================
+PART 2 — TOOL EXECUTION & TOOL CALL TRACE
+=====================================================
+
+Execution Authority:
+- ONLY the app layer executes tools
+- Tools execute AFTER agent output
+- Tools are subject to workspace boundaries and trust gating
+
+Every tool execution MUST append a Tool Call Trace
+to the RunRecord:
+
+{
+  "tool_calls": [
+    {
+      "tool_id": "fs_tree",
+      "timestamp": "2026-02-07T15:12:44Z",
+      "inputs": {
+        "workspace": "lathe-self-test",
+        "ext": ".py"
+      },
+      "result_summary": {
+        "file_count": 42
+      },
+      "status": "success"
+    }
+  ]
+}
+
+Rules:
+- Full raw tool output is stored internally
+- Only summaries appear in the trace
+- Tool calls are immutable
+- Tool calls appear in:
+  - GET /runs/{id}
+  - TUI Replay
+- If denied:
+  - status = "refused"
+  - refusal reason is recorded verbatim
+
+=====================================================
+PART 3 — AGENT → TOOL → CONTEXT → AGENT FLOW
+=====================================================
+
+STRICT EXECUTION ORDER:
+
+1. Agent Phase 1 — Reasoning
+   - Receives task + existing context
+   - MAY emit tool_request
+   - MUST NOT fabricate tool results
+
+2. Tool Phase — Execution
+   - App validates request
+   - App executes tool
+   - App records tool trace
+   - App extracts structured context
+
+3. Agent Phase 2 — Explanation
+   - Agent is invoked again
+   - Tool output is injected as READ-ONLY context
+   - Agent explains results and proposes next steps
+
+=====================================================
+TOOL RESULT CONTEXT FORMAT (REQUIRED)
+=====================================================
+
+Injected tool context MUST be wrapped exactly as:
+
+TOOL_CONTEXT_START
+Tool: fs_tree
+Workspace: lathe-self-test
+Result:
+- lathe_app/server.py
+- lathe_app/orchestrator.py
+- lathe/validation/context_echo.py
+...
+TOOL_CONTEXT_END
+
+Rules:
+- Agent may reference ONLY what appears inside this block
+- Context Echo validation still applies
+- Tool context is isolated from prompt history
+
+=====================================================
+FAILURE MODES (MANDATORY)
+=====================================================
+
+- Nonexistent tool → refusal
+- Invalid inputs → refusal
+- Insufficient trust → refusal
+- Tool failure → recorded failure + error context
+- NO retries
+- NO silent fallback
+- NO alternative tool substitution
+
+=====================================================
+OBSERVABILITY GUARANTEES
+=====================================================
+
+An operator must be able to answer:
+
+- Which tool was requested?
+- Why was it requested?
+- Was it allowed?
+- What inputs were used?
+- What was returned?
+- How did the agent use it?
+
+WITHOUT re-execution.
+
+=====================================================
+EXPLICITLY FORBIDDEN
+=====================================================
+
+- Agents calling HTTP endpoints directly
+- Agents fabricating filesystem or git results
+- Tools mutating workspace state
+- Kernel imports in tools or orchestration
+- Tool logic hidden inside prompts
+- Any behavior not described in this contract
+
+=====================================================
+ACCEPTANCE CRITERIA
+=====================================================
+
+Implementation is complete when:
+
+- GET /tools exposes available tools
+- Agents request tools declaratively
+- App executes tools deterministically
+- Tool calls appear in RunRecords
+- TUI Replay displays tool calls and results
+- Agents reference injected tool context only
+- All existing tests pass
+- Kernel remains unchanged
+
+=====================================================
+FINAL INSTRUCTION
+=====================================================
+
+Implement EXACTLY as specified.
+Do NOT simplify.
+Do NOT reinterpret.
+If a behavior is not explicitly permitted, it is forbidden.
