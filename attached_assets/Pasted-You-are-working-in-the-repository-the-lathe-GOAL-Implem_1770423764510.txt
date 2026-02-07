@@ -1,0 +1,101 @@
+You are working in the repository "the-lathe".
+
+GOAL
+Implement a first-class “Lathe Agent Contract” and deterministic “Context Echo Validation” in the APP LAYER ONLY (lathe_app/), enforcing that the model can only reference files it explicitly echoed. This must be enforced before the kernel parses model output, and must not modify lathe/ (kernel) at all.
+
+ARCHITECTURAL LAW (NON-NEGOTIABLE)
+- lathe/ is pure and stateless: NO new state, NO new filesystem writes, NO side effects, NO new logic.
+- All new functionality goes in lathe_app/.
+- Enforcement must be deterministic: no retries, no reframing, no model escalation inside the validator.
+- If context echo validation fails, return a structured refusal through the existing pipeline.
+
+BEHAVIORAL SPEC
+We enforce a “Context Echo Block” in the model’s raw text output.
+
+Required block delimiters:
+CONTEXT_ECHO_START
+CONTEXT_ECHO_END
+
+Required fields inside the echo block:
+- Workspace: <workspace_name>
+- Snapshot: <snapshot_id>
+- Files:
+  - <path1>
+  - <path2>
+  - ...
+
+Rules enforced:
+1) Echo block must exist with correct delimiters.
+2) Workspace, Snapshot, and Files must be present.
+3) Any file path referenced anywhere in the model’s reasoning/steps/proposals must appear in the Files list.
+4) Structural validation only (NO semantic judgment).
+
+IMPLEMENTATION PHASES
+
+PHASE 1 — Canonical Contract (doc only)
+Create: lathe_app/contracts/agent_contract.md
+- Store the Agent Contract verbatim as a canonical document.
+- This file is read-only (no runtime mutation).
+- It must describe the required Context Echo Block format and the rule “no file references outside echoed Files list”.
+
+PHASE 2 — Deterministic Validator
+Create: lathe_app/validation/context_echo.py
+- Implement a pure deterministic validator with:
+  - parse_context_echo(raw_text) -> parsed echo structure OR error
+  - validate_context_echo(raw_text, workspace_name, snapshot_id, referenced_paths) -> (ok, errors, parsed)
+- Extract echoed file paths from Files list.
+- Extract referenced paths from raw output by scanning:
+  - proposal target fields
+  - step target fields
+  - any “file:” or path-like mentions in the output text
+(Use a conservative approach: only treat strings that look like repo-relative paths as references.)
+- Produce structured errors like:
+  - MISSING_ECHO_BLOCK
+  - MISSING_REQUIRED_FIELD
+  - REFERENCED_FILE_NOT_ECHOED
+- No external deps.
+
+PHASE 3 — Orchestrator Wiring (critical)
+Modify: lathe_app/orchestrator.py
+- Add flag: require_context_echo: bool (default False).
+- Wrap the agent_fn so we can intercept the RAW model text BEFORE kernel parsing.
+- The wrapper must:
+  - call the underlying agent_fn to get raw_text
+  - run context echo validation against raw_text
+  - if invalid, return a structured refusal payload compatible with the rest of the system
+  - if valid, pass through raw_text unchanged
+- IMPORTANT: Ensure BOTH normal generation AND speculative escalation paths use the wrapped agent_fn. (Previously escalation used self._agent_fn directly; fix this by routing everything through the wrapped function.)
+- Kernel remains untouched.
+
+PHASE 4 — Comprehensive Tests
+Create tests proving:
+- Missing echo rejected
+- Malformed echo rejected (missing delimiters or missing fields)
+- Referenced files not in Files list rejected
+- Valid echo passes
+- Orchestrator integration: require_context_echo=True enforces validation
+- Speculative escalation path ALSO enforces validation
+- Regression: kernel untouched tests still pass
+
+Add/update docs:
+- Update replit.md with a concise “Agent Contract & Context Echo” section
+- Include the exact echo block format
+- Mention enforcement occurs in lathe_app orchestrator wrapper (not kernel)
+
+SUCCESS CRITERIA
+- All tests pass (existing + new)
+- Total test count increases appropriately
+- Server still runs: python -m lathe_app.server
+- Kernel untouched: no changes in lathe/
+- Context echo enforcement blocks any output that references non-echoed files
+
+PROCESS REQUIREMENTS
+- Implement phase-by-phase. After each phase, run tests relevant to that phase.
+- At the end, run full suite: pytest -q
+- Produce a short final report:
+  - files changed/added
+  - what was enforced
+  - proof tests pass
+  - confirm kernel untouched
+
+BEGIN NOW.

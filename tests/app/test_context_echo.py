@@ -353,6 +353,71 @@ Files:
         assert "echo_block_missing" in details
 
 
+    def test_speculative_escalation_also_enforces_echo(self):
+        from lathe_app.orchestrator import Orchestrator
+        from lathe_app.storage import InMemoryStorage
+
+        agent_fn = self._make_agent_fn(json.dumps({
+            "proposals": [],
+            "assumptions": [],
+            "risks": [],
+            "results": ["done"],
+            "model_fingerprint": "test-model",
+        }))
+
+        storage = InMemoryStorage()
+        orch = Orchestrator(
+            agent_fn=agent_fn,
+            storage=storage,
+            require_context_echo=True,
+        )
+
+        run = orch.execute(
+            intent="propose",
+            task="add feature",
+            why={"goal": "test"},
+            speculative=True,
+        )
+
+        assert run.success is False
+        assert "Context Echo" in run.output.reason
+
+    def test_undeclared_file_in_proposals_rejected_via_orchestrator(self):
+        from lathe_app.orchestrator import Orchestrator
+        from lathe_app.storage import InMemoryStorage
+
+        response = f"""{ECHO_START}
+Workspace: test
+Snapshot: snap-1
+Files:
+- src/main.py
+{ECHO_END}
+""" + json.dumps({
+            "proposals": [{"action": "create", "target": "src/secret.py"}],
+            "assumptions": [],
+            "risks": [],
+            "results": ["done"],
+            "model_fingerprint": "test-model",
+        })
+
+        agent_fn = self._make_agent_fn(response)
+        storage = InMemoryStorage()
+        orch = Orchestrator(
+            agent_fn=agent_fn,
+            storage=storage,
+            require_context_echo=True,
+        )
+
+        run = orch.execute(
+            intent="propose",
+            task="add feature",
+            why={"goal": "test"},
+        )
+
+        assert run.success is False
+        assert "Context Echo" in run.output.reason
+
+
 class TestKernelUntouched:
 
     def test_no_context_echo_imports_in_kernel(self):

@@ -57,7 +57,7 @@ lathe_app/          # Application layer (all state lives here)
     ├── errors.py   # Workspace-specific error types
     └── status.py   # Index status tracking
 
-tests/              # 589 tests
+tests/              # 591 tests
 ├── test_*.py       # Core Lathe tests
 └── app/            # App layer tests
 ```
