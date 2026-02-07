@@ -38,6 +38,10 @@ lathe_app/          # Application layer (all state lives here)
 │   └── agent_contract.md  # Mandatory behavioral contract for all agents
 ├── validation/     # Structural validators for agent responses
 │   └── context_echo.py    # Context Echo Block validator (deterministic)
+├── tools/          # GET-based read-only tool registry
+│   ├── __init__.py        # Package exports
+│   ├── registry.py        # ToolSpec dataclass + static TOOL_REGISTRY
+│   └── handlers.py        # Tool implementations (fs_tree, fs_stats, git_status)
 ├── knowledge/      # Knowledge ingestion for RAG
 │   ├── models.py   # Document, Chunk, KnowledgeIndexStatus
 │   ├── ingest.py   # File ingestion with chunking
@@ -65,12 +69,13 @@ lathe_tui/          # TUI operator console (PURE HTTP client)
 │   ├── tui.py      # Main Textual application
 │   ├── replay.py   # Pattern C: Run Replay / Debugger screen
 │   ├── console.py  # Pattern A: Worker Console / Live View screen
-│   └── styles.py   # TUI stylesheet
+│   ├── theme.tcss  # Flexoki Dark theme stylesheet
+│   └── timeformat.py # 12-hour local time formatter
 ├── tools/
 │   └── smoke.py    # Headless smoke test script
 └── README.md       # Install & run instructions
 
-tests/              # 620 tests
+tests/              # 644 tests
 ├── test_*.py       # Core Lathe tests
 ├── app/            # App layer tests
 └── tui/            # TUI client unit tests
@@ -125,6 +130,10 @@ python -m lathe_tui --smoke
 | `/runs/stats` | GET | Aggregated run statistics (by intent, model, rates) |
 | `/workspace/stats` | GET | Workspace statistics (file counts, extensions) |
 | `/health/summary` | GET | Health summary (recent errors, success rate) |
+| `/tools` | GET | List all available tools (registry discovery) |
+| `/tools/fs_tree` | GET | List files in workspace (query: workspace, ext) |
+| `/tools/fs_stats` | GET | Count files by extension (query: workspace) |
+| `/tools/git_status` | GET | Git status summary (query: workspace) |
 
 ### OpenWebUI Tools
 

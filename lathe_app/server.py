@@ -210,6 +210,11 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.handle_workspace_stats()
             elif path == "/health/summary":
                 self.handle_health_summary()
+            elif path == "/tools":
+                self.handle_tools_list()
+            elif path.startswith("/tools/"):
+                tool_id = path[7:]
+                self.handle_tool_invoke(tool_id, query)
             else:
                 self.send_json(make_refusal("not_found", f"Unknown path: {path}"), 404)
         except Exception as e:
@@ -730,6 +735,46 @@ class AppHandler(BaseHTTPRequestHandler):
             self.send_json(make_refusal("invalid_path", str(e)), 400)
         except Exception as e:
             self.send_json(make_refusal("workspace_error", str(e)))
+
+    def handle_tools_list(self):
+        from lathe_app.tools.registry import TOOL_REGISTRY
+        self.send_json({
+            "tools": [t.to_dict() for t in TOOL_REGISTRY],
+        })
+
+    def handle_tool_invoke(self, tool_id: str, query: dict):
+        from lathe_app.tools.registry import get_tool_spec
+        from lathe_app.tools.handlers import TOOL_HANDLERS
+
+        spec = get_tool_spec(tool_id)
+        if spec is None:
+            self.send_json(make_refusal("not_found", f"Unknown tool: {tool_id}"), 404)
+            return
+
+        handler = TOOL_HANDLERS.get(tool_id)
+        if handler is None:
+            self.send_json(make_refusal("not_implemented", f"Tool '{tool_id}' has no handler"), 501)
+            return
+
+        workspace_id = query.get("workspace", [None])[0]
+        if not workspace_id:
+            self.send_json(make_refusal("missing_fields", "Missing required query param: workspace"), 400)
+            return
+
+        kwargs = {"workspace_id": workspace_id}
+
+        if tool_id == "fs_tree":
+            ext = query.get("ext", [None])[0]
+            if ext:
+                kwargs["ext"] = ext
+
+        result = handler(**kwargs)
+
+        if "error" in result:
+            status = 403 if result["error"] == "trust_denied" else 400
+            self.send_json(result, status)
+        else:
+            self.send_json(result)
 
 
 DEFAULT_PORT = 3001
