@@ -1,0 +1,142 @@
+You are implementing the Lathe TUI as a separate Python package that is a PURE HTTP CLIENT.
+
+STRICT RULES:
+- Do NOT modify `lathe/` (kernel) at all.
+- Do NOT modify `lathe_app/` at all for this step.
+- The TUI MUST NOT import `lathe.*` or `lathe_app.*` anywhere.
+- The TUI MUST NOT touch filesystem or git directly.
+- The TUI ONLY talks to `lathe_app.server` via HTTP endpoints (requests).
+
+GOAL:
+Create a “dope” terminal UI (TUI) for The Lathe implementing ONLY:
+- Pattern C: Run Replay / Debugger (must be completed first)
+- Pattern A: Worker Console (live view) (second)
+
+Scope is defined by the “Lathe TUI Architecture & Operator Contract” provided by the operator. Treat it as binding law.
+
+--------------------------------------------------------------------
+PHASE 0 — CREATE A NEW TUI PACKAGE (NO CHANGES TO SERVER)
+--------------------------------------------------------------------
+1) Add a new top-level folder: `lathe_tui/`
+2) Add a Python package inside: `lathe_tui/app/`
+3) Add a console entrypoint so we can run:
+   `python -m lathe_tui`
+   and/or
+   `lathe-tui` (console_script if pyproject uses it)
+4) Add dependencies (minimal):
+   - textual
+   - requests
+   - pydantic (optional but preferred)
+   Do NOT add heavy dependencies.
+
+--------------------------------------------------------------------
+PHASE 1 — HTTP CLIENT LAYER (MUST BE TESTABLE)
+--------------------------------------------------------------------
+Implement `lathe_tui/app/client.py`:
+- A LatheClient class with:
+  - base_url (default http://127.0.0.1:5000)
+  - timeout seconds
+  - methods that map to endpoints:
+    * health()
+    * health_summary()
+    * runs_list(params)
+    * runs_get(run_id)
+    * runs_stats()
+    * run_review_get(run_id)
+    * run_staleness_get(run_id)
+    * workspace_list()
+    * workspace_stats()
+    * fs_tree(params) [optional if exists]
+    * fs_run_files(run_id) [optional if exists]
+- Gracefully handle missing endpoints:
+  - If 404, return {"ok": false, "missing_endpoint": true, ...}
+- On connection refused: return structured error that UI can display.
+
+Add unit tests for client layer using mocked requests (NO live server required).
+
+--------------------------------------------------------------------
+PHASE 2 — PATTERN C UI (RUN REPLAY / DEBUGGER) — FIRST
+--------------------------------------------------------------------
+Implement a Textual app:
+- Left pane: runs list (from GET /runs)
+- Right pane: run detail view (from GET /runs/{id})
+
+Run Replay must show these sections (display verbatim, no summarizing):
+1) Identity: run_id, workspace, intent, timestamp, model tier (if present)
+2) Model selection + speculative escalation info (if present)
+3) Validation outcomes + classification (if present)
+4) Context Echo section:
+   - show echoed Workspace / Snapshot / Files
+   - show violation list (if present)
+5) Review gate:
+   - GET /runs/{id}/review
+6) Staleness:
+   - GET /runs/{id}/staleness (if endpoint exists)
+7) Files touched:
+   - GET /fs/run/{id}/files (if endpoint exists)
+
+Controls:
+- Keybinds:
+  - j/k scroll runs
+  - Enter load run
+  - r refresh
+  - q quit
+
+This is deterministic replay only:
+- No re-execution
+- No mutation
+
+--------------------------------------------------------------------
+PHASE 3 — PATTERN A UI (WORKER CONSOLE / LIVE VIEW) — SECOND
+--------------------------------------------------------------------
+Add a “Console” screen:
+- Top: health summary
+- Middle: recent runs (with outcome + intent + workspace + model tier)
+- Bottom: stats summary (GET /runs/stats + GET /workspace/stats)
+
+Polling:
+- configurable refresh interval (default 2 seconds)
+- if server unreachable, show banner and pause fast retries (exponential backoff)
+
+Write no business logic. Render server responses.
+
+--------------------------------------------------------------------
+PHASE 4 — OPTIONAL: TRUST-GATED REVIEW ACTION (ONLY IF ENDPOINT EXISTS)
+--------------------------------------------------------------------
+If the server exposes a review POST endpoint (ex: POST /review):
+- add buttons:
+  - Approve
+  - Reject
+- on click: submit request to server, display the server response verbatim
+- never assume permission; 403 must be displayed as-is
+If endpoint missing: hide actions.
+
+--------------------------------------------------------------------
+PHASE 5 — SMOKE TEST SCRIPT
+--------------------------------------------------------------------
+Add `lathe_tui/tools/smoke.py`:
+- Runs health()
+- Lists runs (limit 5)
+- Fetches first run detail if exists
+- Prints “SMOKE_OK” on success
+This must be runnable without the TUI UI (headless).
+
+--------------------------------------------------------------------
+DELIVERABLES
+--------------------------------------------------------------------
+- `lathe_tui/` package with Textual UI
+- client unit tests
+- smoke script
+- README with:
+  - install steps
+  - run steps
+  - how to point to different base_url
+
+STOP when complete. Do not modify server or kernel.
+
+Before finishing:
+- Run unit tests
+- Ensure imports do not include `lathe` or `lathe_app`
+- Ensure no filesystem access beyond reading its own config
+
+Begin now.

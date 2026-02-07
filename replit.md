@@ -57,9 +57,23 @@ lathe_app/          # Application layer (all state lives here)
     ├── errors.py   # Workspace-specific error types
     └── status.py   # Index status tracking
 
-tests/              # 591 tests
+lathe_tui/          # TUI operator console (PURE HTTP client)
+├── __init__.py     # Package init
+├── __main__.py     # CLI entrypoint (python -m lathe_tui)
+├── app/
+│   ├── client.py   # LatheClient — HTTP client for lathe_app.server
+│   ├── tui.py      # Main Textual application
+│   ├── replay.py   # Pattern C: Run Replay / Debugger screen
+│   ├── console.py  # Pattern A: Worker Console / Live View screen
+│   └── styles.py   # TUI stylesheet
+├── tools/
+│   └── smoke.py    # Headless smoke test script
+└── README.md       # Install & run instructions
+
+tests/              # 620 tests
 ├── test_*.py       # Core Lathe tests
-└── app/            # App layer tests
+├── app/            # App layer tests
+└── tui/            # TUI client unit tests
 ```
 
 ## Running the Application
@@ -77,6 +91,15 @@ LATHE_APP_PORT=4000 python -m lathe_app.server
 
 # Kernel server (port 5000, direct access)
 python -m lathe.server
+
+# TUI operator console (connects to app server)
+python -m lathe_tui
+
+# TUI with custom URL
+python -m lathe_tui --url http://myhost:4000
+
+# TUI smoke test (headless)
+python -m lathe_tui --smoke
 ```
 
 ## HTTP API (lathe_app.server)

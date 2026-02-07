@@ -22,6 +22,10 @@ args = "Lathe CLI"
 task = "workflow.run"
 args = "Lathe App Server"
 
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "Lathe TUI"
+
 [[workflows.workflow]]
 name = "Lathe CLI"
 author = "agent"
@@ -44,6 +48,17 @@ outputType = "console"
 task = "shell.exec"
 args = "python -m lathe_app.server"
 waitForPort = 3001
+
+[[workflows.workflow]]
+name = "Lathe TUI"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "python -m lathe_tui"
+
+[workflows.workflow.metadata]
+outputType = "console"
 
 [deployment]
 deploymentTarget = "cloudrun"
