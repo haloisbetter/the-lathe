@@ -76,7 +76,7 @@ class ConsoleScreen(Screen):
                 self._timer.stop()
                 self._timer = self.set_interval(self._backoff, self._poll)
             widget.update(
-                "[bold red]━━━ DISCONNECTED ━━━[/]\n"
+                "[bold #D14D41]━━━ DISCONNECTED ━━━[/]\n"
                 f"  Cannot reach {self.client.base_url}\n"
                 f"  Retrying every {self._backoff:.0f}s"
             )
@@ -89,17 +89,17 @@ class ConsoleScreen(Screen):
                 self._timer.stop()
                 self._timer = self.set_interval(self.poll_interval, self._poll)
 
-        lines = ["[bold cyan]━━━ SYSTEM HEALTH ━━━[/]"]
-        lines.append(f"  Status: [green]Connected[/]")
+        lines = ["[bold #3AA99F]━━━ SYSTEM HEALTH ━━━[/]"]
+        lines.append(f"  Status: [#879A39]Connected[/]")
 
         if summary and not summary.get("error_type"):
             rate = summary.get("success_rate", None)
             if rate is not None:
-                color = "green" if rate >= 0.8 else "yellow" if rate >= 0.5 else "red"
+                color = "#879A39" if rate >= 0.8 else "#D0A215" if rate >= 0.5 else "#D14D41"
                 lines.append(f"  Success rate: [{color}]{rate:.0%}[/]")
             recent_errors = summary.get("recent_errors", [])
             if recent_errors:
-                lines.append(f"  Recent errors: [red]{len(recent_errors)}[/]")
+                lines.append(f"  Recent errors: [#D14D41]{len(recent_errors)}[/]")
                 for err in recent_errors[:3]:
                     lines.append(f"    • {err}")
             total = summary.get("total_runs", None)
@@ -111,24 +111,24 @@ class ConsoleScreen(Screen):
     def _refresh_runs(self) -> None:
         widget = self.query_one("#console-runs", Static)
         if not self._connected:
-            widget.update("[dim]  Waiting for connection...[/]")
+            widget.update("[#878580]  Waiting for connection...[/]")
             return
 
         data = self.client.runs_list(params={"limit": 15})
         if data.get("error_type"):
-            widget.update(f"[red]  Error loading runs: {data.get('message', '?')}[/]")
+            widget.update(f"[#D14D41]  Error loading runs: {data.get('message', '?')}[/]")
             return
 
         runs = data.get("runs", [])
-        lines = ["[bold cyan]━━━ RECENT RUNS ━━━[/]"]
+        lines = ["[bold #3AA99F]━━━ RECENT RUNS ━━━[/]"]
         if not runs:
-            lines.append("  [dim]No runs recorded[/]")
+            lines.append("  [#878580]No runs recorded[/]")
         else:
             lines.append(f"  {'STATUS':<8} {'INTENT':<12} {'WORKSPACE':<16} {'ID'}")
             lines.append(f"  {'─'*8} {'─'*12} {'─'*16} {'─'*24}")
             for r in runs:
                 success = r.get("success")
-                status = "[green]OK[/]    " if success else "[red]FAIL[/]  " if success is False else "[yellow]?[/]     "
+                status = "[#879A39]OK[/]    " if success else "[#D14D41]FAIL[/]  " if success is False else "[#D0A215]?[/]     "
                 intent = r.get("intent", "?")[:12]
                 ws = (r.get("workspace") or "—")[:16]
                 rid = r.get("id", r.get("run_id", "?"))
@@ -149,7 +149,7 @@ class ConsoleScreen(Screen):
         run_stats = self.client.runs_stats()
         ws_stats = self.client.workspace_stats()
 
-        lines = ["[bold cyan]━━━ STATISTICS ━━━[/]"]
+        lines = ["[bold #3AA99F]━━━ STATISTICS ━━━[/]"]
 
         if run_stats and not run_stats.get("error_type"):
             by_intent = run_stats.get("by_intent", {})

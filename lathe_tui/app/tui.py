@@ -5,18 +5,18 @@ Main Textual application binding Pattern A (Console) and Pattern C (Replay).
 Pure HTTP client — no imports from lathe or lathe_app.
 """
 import os
+from pathlib import Path
 from textual.app import App
 
 from .client import LatheClient
 from .replay import ReplayScreen
 from .console import ConsoleScreen
-from .styles import APP_CSS
 
 
 class LatheTUI(App):
     TITLE = "The Lathe"
     SUB_TITLE = "Operator Console"
-    CSS = APP_CSS
+    CSS_PATH = str(Path(__file__).parent / "theme.tcss")
 
     MODES = {
         "replay": ReplayScreen,
@@ -42,6 +42,9 @@ class LatheTUI(App):
     def switch_mode(self, mode: str) -> None:
         screen = self._get_mode_screen(mode)
         self.push_screen(screen)
+
+    def action_screenshot(self, *args, **kwargs) -> None:
+        self.notify("Screenshots disabled. Use terminal recording instead.")
 
 
 def run_tui(base_url: str | None = None, poll_interval: float = 2.0) -> None:

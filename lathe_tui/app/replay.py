@@ -23,6 +23,7 @@ from textual.widgets import (
 from textual.binding import Binding
 
 from .client import LatheClient
+from .timeformat import format_timestamp
 
 
 def _safe_get(d, *keys, default="—"):
@@ -41,7 +42,7 @@ class RunListItem(ListItem):
         run_id = run_data.get("id", run_data.get("run_id", "?"))
         intent = run_data.get("intent", "?")
         success = run_data.get("success", None)
-        indicator = "[green]OK[/]" if success else "[red]FAIL[/]" if success is False else "[yellow]?[/]"
+        indicator = "[#879A39]OK[/]" if success else "[#D14D41]FAIL[/]" if success is False else "[#D0A215]?[/]"
         label = f"{indicator}  {intent:<10} {run_id}"
         super().__init__()
         self._label_text = label
@@ -58,7 +59,7 @@ class RunDetailPanel(VerticalScroll):
     def clear_detail(self) -> None:
         self._current_run_id = None
         self.remove_children()
-        self.mount(Static("[dim]Select a run to inspect[/]", markup=True))
+        self.mount(Static("[#878580]Select a run to inspect[/]", markup=True))
 
     def show_loading(self) -> None:
         self.remove_children()
@@ -66,27 +67,27 @@ class RunDetailPanel(VerticalScroll):
 
     def show_error(self, message: str) -> None:
         self.remove_children()
-        self.mount(Static(f"[red]{message}[/]", markup=True))
+        self.mount(Static(f"[#D14D41]{message}[/]", markup=True))
 
     def show_run(self, run: dict, review: dict, staleness: dict, files: dict) -> None:
         run_id = run.get("id", run.get("run_id", "?"))
         self._current_run_id = run_id
         self.remove_children()
 
-        self.mount(Static("[bold cyan]━━━ IDENTITY ━━━[/]", markup=True))
+        self.mount(Static("[bold #3AA99F]━━━ IDENTITY ━━━[/]", markup=True))
         run_id = run.get("id", run.get("run_id", "?"))
         self.mount(Static(f"  Run ID:     {run_id}"))
         self.mount(Static(f"  Intent:     {_safe_get(run, 'intent')}"))
         self.mount(Static(f"  Task:       {_safe_get(run, 'task')}"))
         self.mount(Static(f"  Workspace:  {_safe_get(run, 'workspace', default='(none)')}"))
-        self.mount(Static(f"  Timestamp:  {_safe_get(run, 'timestamp')}"))
+        self.mount(Static(f"  Timestamp:  {format_timestamp(_safe_get(run, 'timestamp'))}"))
         self.mount(Static(f"  Success:    {_safe_get(run, 'success')}"))
 
         model = _safe_get(run, 'model_used', default=None) or _safe_get(run, 'model', default=None)
         tier = _safe_get(run, 'model_tier', default=None)
         if model or tier:
             self.mount(Rule())
-            self.mount(Static("[bold cyan]━━━ MODEL SELECTION ━━━[/]", markup=True))
+            self.mount(Static("[bold #3AA99F]━━━ MODEL SELECTION ━━━[/]", markup=True))
             if model:
                 self.mount(Static(f"  Model:      {model}"))
             if tier:
@@ -101,7 +102,7 @@ class RunDetailPanel(VerticalScroll):
         output = run.get("output", {})
         if isinstance(output, dict):
             self.mount(Rule())
-            self.mount(Static("[bold cyan]━━━ VALIDATION & CLASSIFICATION ━━━[/]", markup=True))
+            self.mount(Static("[bold #3AA99F]━━━ VALIDATION & CLASSIFICATION ━━━[/]", markup=True))
             if "reason" in output:
                 self.mount(Static(f"  Reason:     {output['reason']}"))
             if "details" in output:
@@ -133,7 +134,7 @@ class RunDetailPanel(VerticalScroll):
         context_echo = run.get("context_echo", None)
         if context_echo and isinstance(context_echo, dict):
             self.mount(Rule())
-            self.mount(Static("[bold cyan]━━━ CONTEXT ECHO ━━━[/]", markup=True))
+            self.mount(Static("[bold #3AA99F]━━━ CONTEXT ECHO ━━━[/]", markup=True))
             self.mount(Static(f"  Valid:      {context_echo.get('valid', '?')}"))
             self.mount(Static(f"  Workspace:  {context_echo.get('workspace', '?')}"))
             self.mount(Static(f"  Snapshot:   {context_echo.get('snapshot', '?')}"))
@@ -144,16 +145,16 @@ class RunDetailPanel(VerticalScroll):
                     self.mount(Static(f"    • {f}"))
             violations = context_echo.get("violations", [])
             if violations:
-                self.mount(Static(f"  [red]Violations ({len(violations)}):[/]", markup=True))
+                self.mount(Static(f"  [#D14D41]Violations ({len(violations)}):[/]", markup=True))
                 for v in violations:
                     rule = v.get("rule", "?")
                     detail = v.get("detail", "?")
-                    self.mount(Static(f"    [red]✗ {rule}: {detail}[/]", markup=True))
+                    self.mount(Static(f"    [#D14D41]✗ {rule}: {detail}[/]", markup=True))
 
         why = run.get("why", {})
         if why and isinstance(why, dict):
             self.mount(Rule())
-            self.mount(Static("[bold cyan]━━━ WHY RECORD ━━━[/]", markup=True))
+            self.mount(Static("[bold #3AA99F]━━━ WHY RECORD ━━━[/]", markup=True))
             for k, v in why.items():
                 self.mount(Static(f"  {k}: {v}"))
 
@@ -161,7 +162,7 @@ class RunDetailPanel(VerticalScroll):
 
         if review and review_endpoint_exists and review.get("ok", True):
             self.mount(Rule())
-            self.mount(Static("[bold cyan]━━━ REVIEW GATE ━━━[/]", markup=True))
+            self.mount(Static("[bold #3AA99F]━━━ REVIEW GATE ━━━[/]", markup=True))
             state = review.get("state", review.get("action", "—"))
             self.mount(Static(f"  State:      {state}"))
             reviewer = review.get("reviewer", review.get("reviewed_by", None))
@@ -172,7 +173,7 @@ class RunDetailPanel(VerticalScroll):
                 self.mount(Static(f"  Comment:    {comment}"))
             reviewed_at = review.get("reviewed_at", None)
             if reviewed_at:
-                self.mount(Static(f"  Reviewed:   {reviewed_at}"))
+                self.mount(Static(f"  Reviewed:   {format_timestamp(reviewed_at)}"))
 
         if review_endpoint_exists:
             self.mount(Button("Approve", id="btn-approve", variant="success"))
@@ -181,31 +182,31 @@ class RunDetailPanel(VerticalScroll):
 
         if staleness and not staleness.get("missing_endpoint") and staleness.get("ok", True):
             self.mount(Rule())
-            self.mount(Static("[bold cyan]━━━ STALENESS ━━━[/]", markup=True))
+            self.mount(Static("[bold #3AA99F]━━━ STALENESS ━━━[/]", markup=True))
             stale = staleness.get("potentially_stale", False)
-            color = "red" if stale else "green"
+            color = "#D14D41" if stale else "#879A39"
             self.mount(Static(f"  Potentially stale: [{color}]{stale}[/]", markup=True))
             self.mount(Static(f"  Stale files:  {staleness.get('stale_count', 0)}"))
             self.mount(Static(f"  Fresh files:  {staleness.get('fresh_count', 0)}"))
             stale_files = staleness.get("stale_files", [])
             for sf in stale_files[:10]:
-                self.mount(Static(f"    [red]• {sf}[/]", markup=True))
+                self.mount(Static(f"    [#D14D41]• {sf}[/]", markup=True))
 
         if files and not files.get("missing_endpoint") and files.get("ok", True):
             touched = files.get("files", [])
             if touched:
                 self.mount(Rule())
-                self.mount(Static("[bold cyan]━━━ FILES TOUCHED ━━━[/]", markup=True))
+                self.mount(Static("[bold #3AA99F]━━━ FILES TOUCHED ━━━[/]", markup=True))
                 for f in touched[:30]:
                     self.mount(Static(f"  • {f}"))
 
         file_reads = run.get("file_reads", [])
         if file_reads:
             self.mount(Rule())
-            self.mount(Static("[bold cyan]━━━ FILE READS ━━━[/]", markup=True))
+            self.mount(Static("[bold #3AA99F]━━━ FILE READS ━━━[/]", markup=True))
             for fr in file_reads[:20]:
                 path = fr.get("path", "?")
-                ts = fr.get("timestamp", "")
+                ts = format_timestamp(fr.get("timestamp", ""))
                 self.mount(Static(f"  • {path}  ({ts})"))
 
 
@@ -239,12 +240,12 @@ class ReplayScreen(Screen):
         runs_list.clear()
 
         if not data.get("ok", True) or data.get("error_type"):
-            runs_list.append(ListItem(Label(f"[red]Error: {data.get('message', 'Connection failed')}[/]", markup=True)))
+            runs_list.append(ListItem(Label(f"[#D14D41]Error: {data.get('message', 'Connection failed')}[/]", markup=True)))
             return
 
         self._runs = data.get("runs", [])
         if not self._runs:
-            runs_list.append(ListItem(Label("[dim]No runs found[/]", markup=True)))
+            runs_list.append(ListItem(Label("[#878580]No runs found[/]", markup=True)))
             return
 
         for run in self._runs:
@@ -299,13 +300,13 @@ class ReplayScreen(Screen):
         status = result.get("_status", 200)
 
         if result.get("error_type"):
-            result_widget.update(f"[red]Error:[/]\n{display}")
+            result_widget.update(f"[#D14D41]Error:[/]\n{display}")
         elif result.get("missing_endpoint"):
-            result_widget.update("[yellow]Review endpoint not available[/]")
+            result_widget.update("[#D0A215]Review endpoint not available[/]")
         elif status >= 400:
-            result_widget.update(f"[red]Server returned {status}:[/]\n{display}")
+            result_widget.update(f"[#D14D41]Server returned {status}:[/]\n{display}")
         else:
-            result_widget.update(f"[green]Server response:[/]\n{display}")
+            result_widget.update(f"[#879A39]Server response:[/]\n{display}")
 
     def action_refresh_runs(self) -> None:
         self.load_runs()

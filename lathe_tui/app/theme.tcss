@@ -1,0 +1,131 @@
+/* Flexoki Dark — https://stephango.com/flexoki */
+/* Base:  black=#100F0F  950=#1C1B1A  900=#282726  850=#343331  800=#403E3C */
+/* Text:  300=#CECDC3  500=#878580  600=#6F6E69 */
+/* Accent dark variants (use 600 for readability on dark bg): */
+/*   red=#D14D41  orange=#DA702C  yellow=#D0A215  green=#879A39 */
+/*   cyan=#3AA99F  blue=#4385BE  purple=#8B7EC8  magenta=#CE5D97 */
+
+Screen {
+    background: #1C1B1A;
+    color: #CECDC3;
+}
+
+Header {
+    background: #100F0F;
+    color: #CECDC3;
+}
+
+Footer {
+    background: #100F0F;
+    color: #878580;
+}
+
+FooterKey {
+    background: #282726;
+    color: #CECDC3;
+}
+
+FooterKey:hover {
+    background: #403E3C;
+}
+
+Rule {
+    color: #343331;
+}
+
+ListView {
+    background: #1C1B1A;
+    color: #CECDC3;
+}
+
+ListView > ListItem {
+    background: #1C1B1A;
+    color: #CECDC3;
+    padding: 0 1;
+}
+
+ListView > ListItem.--highlight {
+    background: #282726;
+    color: #CECDC3;
+}
+
+ListView > ListItem:hover {
+    background: #343331;
+}
+
+Button {
+    background: #282726;
+    color: #CECDC3;
+    border: tall #403E3C;
+    margin: 1 1 0 0;
+}
+
+Button:hover {
+    background: #343331;
+}
+
+Button.-success {
+    background: #282726;
+    color: #879A39;
+    border: tall #879A39;
+}
+
+Button.-success:hover {
+    background: #343331;
+}
+
+Button.-error {
+    background: #282726;
+    color: #D14D41;
+    border: tall #D14D41;
+}
+
+Button.-error:hover {
+    background: #343331;
+}
+
+LoadingIndicator {
+    background: #1C1B1A;
+    color: #3AA99F;
+}
+
+#replay-container {
+    layout: horizontal;
+    height: 1fr;
+}
+
+#runs-list {
+    width: 1fr;
+    min-width: 30;
+    max-width: 50;
+    border-right: solid #343331;
+}
+
+#run-detail {
+    width: 3fr;
+    padding: 1 2;
+    overflow-y: auto;
+    background: #1C1B1A;
+}
+
+#console-health {
+    height: auto;
+    max-height: 8;
+    border-bottom: solid #343331;
+    padding: 1;
+}
+
+#console-runs {
+    height: 1fr;
+    border-bottom: solid #343331;
+}
+
+#console-stats {
+    height: auto;
+    max-height: 12;
+    padding: 1;
+}
+
+TabPane {
+    padding: 0;
+}

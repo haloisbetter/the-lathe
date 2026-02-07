@@ -1,0 +1,99 @@
+You are modifying an existing Python Textual TUI project called `lathe_tui`.
+
+This is a POLISH-ONLY task.  
+Do NOT change architecture, APIs, contracts, or behavior.  
+Do NOT add new features.  
+Do NOT refactor unrelated code.
+
+Your job is to apply three small, explicit fixes so the TUI feels correct and pleasant for an operator.
+
+-------------------------
+FIX 0 — START CLEAN
+-------------------------
+Before making changes:
+
+1. Run:
+   git pull --rebase
+2. Ensure the working tree is clean.
+3. Do not proceed if there are merge conflicts.
+
+-------------------------
+FIX 1 — APPLY FLEXOKI THEME
+-------------------------
+The TUI must use the Flexoki Dark color palette.
+
+Requirements:
+- Use Textual CSS (NOT inline styling).
+- Create or update a CSS file (e.g. `theme.css`) inside the TUI package.
+- Colors must be readable in a terminal (dark background).
+- Buttons, tables, headers, warnings, and errors must all reflect the theme.
+
+Then:
+- Load the CSS using `CSS_PATH` on the main Textual App class.
+
+Do NOT:
+- Hardcode colors in Python
+- Change layout or widget structure
+
+-------------------------
+FIX 2 — STANDARD (12-HOUR) TIME FORMAT
+-------------------------
+All timestamps shown in the TUI must use **12-hour local time**, not military time.
+
+Requirements:
+- Format: `h:mm:ss AM/PM`
+- Respect local timezone
+- Remove leading zero from hour (e.g. `5:53 PM`, not `05:53 PM`)
+
+Apply this consistently across:
+- Console view
+- Replay view
+- Any run timestamps
+
+Do NOT:
+- Change stored timestamps
+- Change server responses
+- Introduce new time logic outside formatting
+
+-------------------------
+FIX 3 — DISABLE OR GRACEFULLY SKIP SCREENSHOTS
+-------------------------
+Screenshots are failing in some environments (e.g. WSL).
+
+Requirements:
+- The TUI must NOT crash or error if screenshots are unavailable.
+- Either:
+  - Disable screenshot functionality entirely, OR
+  - Gracefully skip it with a clear message.
+
+Preferred:
+- Disable screenshots and document that terminal recording should be used instead.
+
+Do NOT:
+- Add platform detection hacks
+- Add external dependencies
+- Add retry logic
+
+-------------------------
+TESTING REQUIREMENTS
+-------------------------
+After changes:
+
+1. Run the TUI locally.
+2. Verify:
+   - Colors match Flexoki Dark
+   - Times render in 12-hour format
+   - No screenshot-related errors appear
+3. Existing tests must still pass.
+4. Do NOT add new tests unless strictly required.
+
+-------------------------
+OUTPUT
+-------------------------
+When finished, report:
+
+- Files changed
+- Brief explanation of each fix
+- Confirmation that behavior is unchanged aside from presentation
+
+Do not include unrelated commentary.
