@@ -1,0 +1,145 @@
+You are acting as a senior systems architect and TUI engineer.
+
+You are working on a project called **The Lathe**, an AI orchestration system with a strict architectural law:
+
+- `lathe/` is a pure, stateless reasoning kernel
+- `lathe_app/` owns all state, I/O, orchestration, workspaces, and execution
+- No UI, TUI, or side effects may touch `lathe/`
+- All interaction must occur through existing HTTP APIs exposed by `lathe_app.server`
+
+Your task in THIS STEP is NOT to write any code.
+
+Your task is to produce a **single, powerful, one-page document** titled:
+
+📄 **Lathe TUI Architecture & Operator Contract**
+
+This document will act as the binding contract for any future TUI implementation.
+
+---
+
+### 🎯 Purpose of the TUI (must be explicit)
+
+The TUI exists to:
+- Observe Lathe operations
+- Inspect past runs deterministically
+- Control approvals within trust constraints
+- Never reason, decide, or bypass validators
+
+State clearly:
+- The TUI is an *operator console*, not an agent
+- The TUI is read-heavy, write-light
+- The TUI cannot invent context, files, or actions
+
+---
+
+### 🧩 Patterns (MANDATORY)
+
+The TUI MUST implement **only** these two patterns:
+
+#### Pattern A — Worker Console (Live View)
+- Shows active and recent runs
+- Displays intent, workspace, model tier, trust level
+- Shows validation / refusal / escalation status
+- Read-only by default
+
+#### Pattern C — Run Replay / Debugger
+- Load a historical RunRecord
+- Step through:
+  - normalization
+  - intent resolution
+  - model selection
+  - speculative escalation
+  - validation (including context echo)
+  - approval or refusal
+- Deterministic replay only (no mutation)
+
+Explicitly state:
+- Pattern B (prompt builder) is OUT OF SCOPE
+- No inline editing of prompts or files
+
+---
+
+### 🔌 Data Sources (API-ONLY)
+
+List the **exact API surfaces** the TUI is allowed to use, such as:
+- `GET /runs`
+- `GET /runs/{id}`
+- `GET /runs/stats`
+- `GET /health/summary`
+- `GET /workspace/stats`
+- `POST /runs/{id}/approve` (if trust allows)
+
+State clearly:
+- No filesystem access
+- No direct git operations
+- No subprocess execution
+- No kernel imports
+
+---
+
+### 🔐 Trust & Safety Guarantees
+
+The contract MUST state:
+- Trust policies are evaluated server-side only
+- The TUI may *request* an action, never assume permission
+- Trust level 4 still cannot bypass workspace boundaries
+- All refusals must be shown verbatim with WHY records
+
+---
+
+### 🧠 Observability Rules
+
+The TUI must:
+- Display decisions and reasons
+- Never display raw prompts
+- Never expose model internals
+- Never retry or reframe on its own
+
+---
+
+### 🖥️ UI Scope & Constraints
+
+Define:
+- TUI runs as a **local worker**
+- Uses a Python TUI framework (Textual preferred)
+- Event loop is UI-only
+- Polling or SSE allowed, but no push logic in kernel
+
+Explicitly forbid:
+- Any business logic in the TUI
+- Any fallback logic
+- Any model selection logic
+
+---
+
+### 📜 Output Requirements
+
+Your output MUST be:
+- One page
+- Structured with headings
+- Clear, authoritative, and enforceable
+- Written as a contract, not a tutorial
+
+DO NOT:
+- Write code
+- Propose features beyond Pattern A and C
+- Suggest kernel changes
+- Suggest prompt-based UIs
+
+End the document with a section titled:
+
+**“Non-Goals (Explicitly Out of Scope)”**
+
+---
+
+### ⛔ Stop Condition (CRITICAL)
+
+After producing the document:
+- STOP
+- Do NOT scaffold files
+- Do NOT write Python
+- Do NOT propose next steps
+
+The next step will be given explicitly by the operator.
+
+Begin now.
