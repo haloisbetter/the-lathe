@@ -27,6 +27,7 @@ from lathe_app.tools.registry import ToolSpec, TOOL_REGISTRY, get_tool_spec
 from lathe_app.tools.requests import (
     ToolRequest,
     ToolRequestError,
+    ToolWhy,
     parse_tool_request,
     validate_tool_request,
     extract_and_validate,
@@ -200,6 +201,7 @@ class TestToolRequestValidation:
         assert err is None
         assert req is not None
         assert req.tool_id == "fs_tree"
+        assert req.why.goal == "List files"
         assert req.reason == "List files"
         assert req.inputs == {"workspace": "my-ws"}
         assert req.spec.id == "fs_tree"
@@ -264,6 +266,7 @@ class TestToolRequestValidation:
         }
         req, err = validate_tool_request(raw)
         assert err is None
+        assert req.why.goal == ""
         assert req.reason == ""
 
 
@@ -297,6 +300,104 @@ class TestExtractAndValidate:
         req, err = extract_and_validate(output)
         assert req is None
         assert err.error_type == "nonexistent_tool"
+
+
+class TestToolCallV1Format:
+    def test_parse_tool_call_with_structured_why(self):
+        output = json.dumps({
+            "tool_call": {
+                "tool_id": "fs_tree",
+                "why": {
+                    "goal": "List project files",
+                    "evidence_needed": "File structure for analysis",
+                    "risk": "None - read only",
+                    "verification": "Check file count matches",
+                },
+                "inputs": {"workspace": "test-ws"},
+            },
+            "proposals": [],
+        })
+        raw = parse_tool_request(output)
+        assert raw is not None
+        assert raw["tool_id"] == "fs_tree"
+        assert raw["why"]["goal"] == "List project files"
+
+    def test_legacy_tool_request_still_works(self):
+        output = json.dumps({
+            "tool_request": {
+                "tool_id": "fs_tree",
+                "reason": "Need file list",
+                "inputs": {"workspace": "ws"},
+            },
+        })
+        raw = parse_tool_request(output)
+        assert raw is not None
+        assert raw["tool_id"] == "fs_tree"
+        assert raw["reason"] == "Need file list"
+
+    def test_tool_call_takes_priority_over_tool_request(self):
+        output = json.dumps({
+            "tool_call": {
+                "tool_id": "fs_stats",
+                "why": {"goal": "From tool_call"},
+                "inputs": {"workspace": "ws"},
+            },
+            "tool_request": {
+                "tool_id": "fs_tree",
+                "reason": "From tool_request",
+                "inputs": {"workspace": "ws"},
+            },
+        })
+        raw = parse_tool_request(output)
+        assert raw["tool_id"] == "fs_stats"
+        assert raw["why"]["goal"] == "From tool_call"
+
+    def test_structured_why_flows_to_tool_call_trace(self):
+        output = json.dumps({
+            "tool_call": {
+                "tool_id": "fs_tree",
+                "why": {
+                    "goal": "Inspect files",
+                    "evidence_needed": "Directory listing",
+                    "risk": "None",
+                    "verification": "Count files",
+                },
+                "inputs": {"workspace": "ws"},
+            },
+        })
+        req, err = extract_and_validate(output)
+        assert err is None
+        assert req is not None
+        assert req.why.goal == "Inspect files"
+        assert req.why.evidence_needed == "Directory listing"
+        assert req.why.risk == "None"
+        assert req.why.verification == "Count files"
+
+    def test_tool_call_trace_to_trace_dict_includes_why(self):
+        why = {"goal": "Test goal", "evidence_needed": "ev", "risk": "low", "verification": "check"}
+        trace = ToolCallTrace.create(
+            tool_id="fs_tree",
+            inputs={"workspace": "ws"},
+            result_summary={"file_count": 5},
+            status="success",
+            why=why,
+        )
+        d = trace.to_trace_dict()
+        assert "why" in d
+        assert d["why"]["goal"] == "Test goal"
+        assert d["why"]["evidence_needed"] == "ev"
+
+    def test_tool_context_block_includes_goal(self):
+        trace = ToolCallTrace.create(
+            tool_id="fs_tree",
+            inputs={"workspace": "ws"},
+            result_summary={"file_count": 2},
+            status="success",
+            why={"goal": "List project structure"},
+            raw_result={"files": ["a.py"], "count": 1, "workspace": "ws"},
+        )
+        block = build_tool_context_block(trace)
+        assert "Goal: List project structure" in block
 
 
 @pytest.fixture
@@ -333,7 +434,7 @@ class TestToolExecution:
     def test_execute_fs_tree_success(self, workspace):
         req = ToolRequest(
             tool_id="fs_tree",
-            reason="List files",
+            why=ToolWhy(goal="List files"),
             inputs={"workspace": "exec-test"},
             spec=get_tool_spec("fs_tree"),
         )
@@ -347,7 +448,7 @@ class TestToolExecution:
     def test_execute_fs_stats_success(self, workspace):
         req = ToolRequest(
             tool_id="fs_stats",
-            reason="Stats",
+            why=ToolWhy(goal="Stats"),
             inputs={"workspace": "exec-test"},
             spec=get_tool_spec("fs_stats"),
         )
@@ -358,7 +459,7 @@ class TestToolExecution:
     def test_execute_workspace_not_found(self, workspace):
         req = ToolRequest(
             tool_id="fs_tree",
-            reason="test",
+            why=ToolWhy(goal="test"),
             inputs={"workspace": "nonexistent"},
             spec=get_tool_spec("fs_tree"),
         )
@@ -378,7 +479,7 @@ class TestToolExecution:
         )
         req = ToolRequest(
             tool_id="fake_tool",
-            reason="test",
+            why=ToolWhy(goal="test"),
             inputs={},
             spec=spec,
         )

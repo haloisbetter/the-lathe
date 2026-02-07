@@ -36,12 +36,19 @@ def _map_inputs_to_handler(tool_id: str, inputs: Dict[str, Any]) -> Dict[str, An
     return mapped
 
 
+def _why_dict(request: ToolRequest) -> Optional[Dict[str, str]]:
+    """Extract structured why dict from request, if present."""
+    return request.why.to_dict()
+
+
 def execute_tool(request: ToolRequest) -> ToolCallTrace:
     """Execute a validated tool request and return an immutable trace.
 
     The handler is looked up from TOOL_HANDLERS by tool_id.
     Trust and workspace boundary checks are delegated to the handler.
     """
+    why = _why_dict(request)
+
     handler = TOOL_HANDLERS.get(request.tool_id)
     if handler is None:
         return ToolCallTrace.create(
@@ -49,6 +56,7 @@ def execute_tool(request: ToolRequest) -> ToolCallTrace:
             inputs=request.inputs,
             result_summary={"error": "no_handler"},
             status="refused",
+            why=why,
             refusal_reason=f"No handler registered for tool '{request.tool_id}'",
         )
 
@@ -62,6 +70,7 @@ def execute_tool(request: ToolRequest) -> ToolCallTrace:
             inputs=request.inputs,
             result_summary={"error": "execution_error", "message": str(exc)},
             status="error",
+            why=why,
             raw_result=None,
         )
 
@@ -74,6 +83,7 @@ def execute_tool(request: ToolRequest) -> ToolCallTrace:
             inputs=request.inputs,
             result_summary={"error": "trust_denied"},
             status="refused",
+            why=why,
             raw_result=raw_result,
             refusal_reason=raw_result.get("message", "Trust level insufficient"),
         )
@@ -84,6 +94,7 @@ def execute_tool(request: ToolRequest) -> ToolCallTrace:
             inputs=request.inputs,
             result_summary={"error": "workspace_not_found"},
             status="refused",
+            why=why,
             raw_result=raw_result,
             refusal_reason=raw_result.get("message", "Workspace not found"),
         )
@@ -94,6 +105,7 @@ def execute_tool(request: ToolRequest) -> ToolCallTrace:
             inputs=request.inputs,
             result_summary={"error": raw_result["error"]},
             status="error",
+            why=why,
             raw_result=raw_result,
         )
 
@@ -104,6 +116,7 @@ def execute_tool(request: ToolRequest) -> ToolCallTrace:
         inputs=request.inputs,
         result_summary=summary,
         status="success",
+        why=why,
         raw_result=raw_result,
     )
 
@@ -155,6 +168,11 @@ def build_tool_context_block(trace: ToolCallTrace) -> str:
 
     workspace = trace.inputs.get("workspace", "NONE")
     lines.append(f"Workspace: {workspace}")
+
+    if trace.why:
+        goal = trace.why.get("goal", "")
+        if goal:
+            lines.append(f"Goal: {goal}")
 
     if trace.status == "success" and trace.raw_result:
         lines.append("Result:")

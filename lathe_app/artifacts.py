@@ -182,6 +182,7 @@ class ToolCallTrace:
     inputs: Dict[str, Any]
     result_summary: Dict[str, Any]
     status: str  # "success" | "refused" | "error"
+    why: Optional[Dict[str, str]] = None
     raw_result: Optional[Dict[str, Any]] = None
     refusal_reason: Optional[str] = None
 
@@ -192,6 +193,7 @@ class ToolCallTrace:
         inputs: Dict[str, Any],
         result_summary: Dict[str, Any],
         status: str,
+        why: Optional[Dict[str, str]] = None,
         raw_result: Optional[Dict[str, Any]] = None,
         refusal_reason: Optional[str] = None,
     ) -> "ToolCallTrace":
@@ -201,6 +203,7 @@ class ToolCallTrace:
             inputs=inputs,
             result_summary=result_summary,
             status=status,
+            why=why,
             raw_result=raw_result,
             refusal_reason=refusal_reason,
         )
@@ -213,6 +216,8 @@ class ToolCallTrace:
             "result_summary": self.result_summary,
             "status": self.status,
         }
+        if self.why is not None:
+            d["why"] = self.why
         if self.refusal_reason is not None:
             d["refusal_reason"] = self.refusal_reason
         return d

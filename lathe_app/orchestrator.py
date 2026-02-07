@@ -27,11 +27,12 @@ Context Echo Validation:
 - Kernel remains untouched
 
 Tool Execution Contract (2-phase agent flow):
-- Phase 1: Agent reasons, may emit tool_request in output
-- Tool Phase: App validates, executes, records ToolCallTrace
-- Phase 2: Agent re-invoked with TOOL_CONTEXT block injected
+- Phase 1: Agent reasons, may emit tool_call (v1) or tool_request (legacy) in output
+- Tool Phase: App validates, executes, records ToolCallTrace with structured why
+- Phase 2: Agent re-invoked with TOOL_CONTEXT block injected (includes Goal from why)
 - Failure modes: nonexistent tool / invalid inputs / trust denied → refusal trace
 - NO retries, NO silent fallback, NO alternative tool substitution
+- Tool-Selection Contract: lathe_app/contracts/tool_selection_contract.md
 """
 import json as _json
 from typing import Any, Callable, Dict, List, Optional
