@@ -89,12 +89,16 @@ Tool 5: lathe_fs
 
 Endpoints:
   POST /agent      - Create a run
-  POST /execute    - Execute an approved proposal
+  POST /execute    - Execute an approved proposal (legacy)
   POST /review     - Review/approve/reject a proposal
   GET  /health     - Health check
   GET  /runs       - List/search runs
   GET  /runs/<id>  - Load a specific run
   GET  /runs/<id>/review - Get review state
+  POST /runs/<id>/execute - Enqueue async execution for an approved run
+  GET  /runs/<id>/execute - Get latest execution job status for run
+  GET  /runs/<id>/tool_traces - Get all tool traces for run (replay)
+  GET  /jobs/<id>  - Get execution job detail
   GET  /fs/tree    - Directory tree (read-only)
   GET  /fs/status  - Git status (read-only)
   GET  /fs/diff    - Git diff (read-only)
@@ -118,8 +122,23 @@ from lathe_app.http_serialization import (
     to_jsonable_query_result,
     to_jsonable_review_result,
 )
+from lathe_app.execution.queue import get_default_queue
+from lathe_app.execution.service import ExecutionService
 
 logger = logging.getLogger(__name__)
+
+_exec_service: ExecutionService = None
+
+
+def _get_exec_service() -> ExecutionService:
+    global _exec_service
+    if _exec_service is None:
+        _exec_service = ExecutionService(
+            queue=get_default_queue(),
+            storage=lathe_app._default_storage,
+            review_manager=lathe_app._default_review,
+        )
+    return _exec_service
 
 
 def make_refusal(reason: str, details: str = "") -> Dict[str, Any]:
@@ -177,9 +196,18 @@ class AppHandler(BaseHTTPRequestHandler):
             elif path.startswith("/runs/") and path.endswith("/staleness"):
                 run_id = path.split("/")[2]
                 self.handle_staleness_check(run_id)
-            elif path.startswith("/runs/") and "/review" in path:
+            elif path.startswith("/runs/") and path.endswith("/review"):
                 run_id = path.split("/")[2]
                 self.handle_get_review(run_id)
+            elif path.startswith("/runs/") and path.endswith("/execute"):
+                run_id = path.split("/")[2]
+                self.handle_get_run_execute(run_id)
+            elif path.startswith("/runs/") and path.endswith("/tool_traces"):
+                run_id = path.split("/")[2]
+                self.handle_get_run_traces(run_id)
+            elif path.startswith("/jobs/"):
+                job_id = path[6:]
+                self.handle_get_job(job_id)
             elif path.startswith("/runs/"):
                 run_id = path[6:]
                 run = lathe_app.load_run(run_id)
@@ -238,6 +266,9 @@ class AppHandler(BaseHTTPRequestHandler):
                 self.handle_execute(body)
             elif path == "/review":
                 self.handle_review(body)
+            elif path.startswith("/runs/") and path.endswith("/execute"):
+                run_id = path.split("/")[2]
+                self.handle_post_run_execute(run_id)
             elif path == "/knowledge/ingest":
                 self.handle_knowledge_ingest(body)
             elif path == "/workspace/create":
@@ -736,6 +767,48 @@ class AppHandler(BaseHTTPRequestHandler):
         except Exception as e:
             self.send_json(make_refusal("workspace_error", str(e)))
 
+    def handle_post_run_execute(self, run_id: str):
+        """Handle POST /runs/<run_id>/execute - enqueue async execution."""
+        svc = _get_exec_service()
+        result = svc.enqueue_run(run_id)
+        status_code = result.pop("status_code", 200)
+        self.send_json(result, status_code)
+
+    def handle_get_run_execute(self, run_id: str):
+        """Handle GET /runs/<run_id>/execute - get latest job status for run."""
+        svc = _get_exec_service()
+        job = svc.get_latest_job_for_run(run_id)
+        if job is None:
+            self.send_json(
+                make_refusal("not_found", f"No execution jobs found for run {run_id}"),
+                404,
+            )
+            return
+        self.send_json(job)
+
+    def handle_get_job(self, job_id: str):
+        """Handle GET /jobs/<job_id> - full job detail with traces."""
+        svc = _get_exec_service()
+        job = svc.get_job(job_id)
+        if job is None:
+            self.send_json(
+                make_refusal("not_found", f"Job {job_id} not found"),
+                404,
+            )
+            return
+        self.send_json(job)
+
+    def handle_get_run_traces(self, run_id: str):
+        """Handle GET /runs/<run_id>/tool_traces - all traces for run (TUI replay)."""
+        svc = _get_exec_service()
+        traces = svc.get_run_traces(run_id)
+        self.send_json({
+            "run_id": run_id,
+            "traces": traces,
+            "count": len(traces),
+            "results": [],
+        })
+
     def handle_tools_list(self):
         from lathe_app.tools.registry import TOOL_REGISTRY
         self.send_json({
@@ -813,12 +886,17 @@ def run_server(host: str = "0.0.0.0", port: int = None):
     """Run the HTTP server."""
     resolved_port = get_port(port)
     server = create_server(host, resolved_port)
+
+    from lathe_app.execution.worker import start_default_worker
+    worker = start_default_worker()
+
     logger.info(f"Lathe App Server listening on {host}:{resolved_port}")
     print(f"Lathe App Server listening on {host}:{resolved_port}")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         logger.info("Server shutting down")
+        worker.stop()
         server.shutdown()
 
 
