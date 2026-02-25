@@ -25,6 +25,7 @@ from textual.binding import Binding
 from .client import LatheClient
 from .timeformat import format_timestamp
 from .execution_ui import OperatorTimeline, HistoryStrip, ExecutionTracePanel
+from .proposal_ui import RiskBadge, ChangeMetrics, DiffPreviewPanel, ProposalReviewPanel
 
 
 def _safe_get(d, *keys, default="—"):
@@ -58,6 +59,33 @@ class RunDetailPanel(VerticalScroll):
         self._current_run_id: str | None = None
         self._client = client
         self._trace_panel: ExecutionTracePanel | None = None
+
+    def _mount_proposal_review(self, run_id: str, proposals: list, review_data: dict) -> None:
+        """
+        Mount proposal review panel with risk badge and diff preview.
+
+        Computes change metrics and risk assessment from proposals.
+        """
+        try:
+            from lathe_app.proposal_analysis import (
+                compute_change_summary,
+                assess_proposal_risk,
+                generate_unified_diff_preview,
+            )
+        except ImportError:
+            return
+
+        metrics = compute_change_summary(proposals)
+        risk_assessment = assess_proposal_risk(proposals, {}, review_data)
+        diff_preview = generate_unified_diff_preview(proposals, max_lines=300)
+
+        panel_id = f"proposal-review-{run_id}"
+        try:
+            self.query_one(f"#{panel_id}")
+        except Exception:
+            panel = ProposalReviewPanel(run_id=run_id, id=panel_id)
+            self.mount(panel)
+            panel.render_proposal(risk_assessment, metrics, diff_preview)
 
     def clear_detail(self) -> None:
         self._current_run_id = None
@@ -137,6 +165,9 @@ class RunDetailPanel(VerticalScroll):
                     action = p.get("action", "?")
                     target = p.get("target", "?")
                     self.mount(Static(f"    [{i+1}] {action} → {target}"))
+
+                self.mount(Rule())
+                self._mount_proposal_review(run_id, proposals, review)
 
             assumptions = output.get("assumptions", [])
             if assumptions:
