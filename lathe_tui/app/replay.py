@@ -24,6 +24,7 @@ from textual.binding import Binding
 
 from .client import LatheClient
 from .timeformat import format_timestamp
+from .execution_ui import OperatorTimeline, HistoryStrip, ExecutionTracePanel
 
 
 def _safe_get(d, *keys, default="—"):
@@ -52,9 +53,11 @@ class RunListItem(ListItem):
 
 
 class RunDetailPanel(VerticalScroll):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, client: LatheClient = None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._current_run_id: str | None = None
+        self._client = client
+        self._trace_panel: ExecutionTracePanel | None = None
 
     def clear_detail(self) -> None:
         self._current_run_id = None
@@ -69,10 +72,26 @@ class RunDetailPanel(VerticalScroll):
         self.remove_children()
         self.mount(Static(f"[#D14D41]{message}[/]", markup=True))
 
-    def show_run(self, run: dict, review: dict, staleness: dict, files: dict) -> None:
+    def show_run(self, run: dict, review: dict, staleness: dict, files: dict, job: dict = None) -> None:
         run_id = run.get("id", run.get("run_id", "?"))
         self._current_run_id = run_id
         self.remove_children()
+
+        if job is None:
+            job = {}
+
+        self.mount(HistoryStrip(run, review_data=review, job_data=job))
+        self.mount(Rule())
+        self.mount(OperatorTimeline(run, review_data=review, job_data=job))
+        self.mount(Rule())
+
+        if self._client and run_id:
+            self._trace_panel = ExecutionTracePanel(self._client, run_id)
+            self.mount(self._trace_panel)
+            self._trace_panel.show_initial_traces()
+            if job.get("status") in ("queued", "running"):
+                self._trace_panel.start_polling()
+            self.mount(Rule())
 
         self.mount(Static("[bold #3AA99F]━━━ IDENTITY ━━━[/]", markup=True))
         run_id = run.get("id", run.get("run_id", "?"))
@@ -180,6 +199,14 @@ class RunDetailPanel(VerticalScroll):
             self.mount(Button("Reject", id="btn-reject", variant="error"))
             self.mount(Static("", id="review-result"))
 
+        if review and review.get("state") == "APPROVED":
+            btn_id = f"btn-execute-{run_id}"
+            try:
+                self.query_one(f"#{btn_id}")
+            except Exception:
+                self.mount(Button("Execute", id=btn_id, variant="primary"))
+            self.mount(Static("", id=f"execute-result-{run_id}"))
+
         if staleness and not staleness.get("missing_endpoint") and staleness.get("ok", True):
             self.mount(Rule())
             self.mount(Static("[bold #3AA99F]━━━ STALENESS ━━━[/]", markup=True))
@@ -251,7 +278,7 @@ class ReplayScreen(Screen):
         yield Header(show_clock=True)
         with Horizontal(id="replay-container"):
             yield ListView(id="runs-list")
-            yield RunDetailPanel(id="run-detail")
+            yield RunDetailPanel(client=self.client, id="run-detail")
         yield Footer()
 
     def on_mount(self) -> None:
@@ -298,8 +325,11 @@ class ReplayScreen(Screen):
         review = self.client.run_review_get(run_id)
         staleness = self.client.run_staleness_get(run_id)
         files = self.client.fs_run_files(run_id)
+        job = self.client.run_execute_status(run_id)
+        if job.get("error_type") or not job.get("ok", True):
+            job = {}
 
-        detail.show_run(run, review, staleness, files)
+        detail.show_run(run, review, staleness, files, job=job)
 
     def on_button_pressed(self, event: Button.Pressed) -> None:
         detail = self.query_one("#run-detail", RunDetailPanel)
@@ -307,31 +337,61 @@ class ReplayScreen(Screen):
         if not run_id:
             return
 
-        if event.button.id == "btn-approve":
+        button_id = event.button.id or ""
+
+        if button_id == "btn-approve":
             action = "approve"
-        elif event.button.id == "btn-reject":
+            result = self.client.review_submit(run_id, action)
+            try:
+                result_widget = detail.query_one("#review-result", Static)
+            except Exception:
+                return
+            display = json.dumps(result, indent=2, default=str)
+            status = result.get("_status", 200)
+            if result.get("error_type"):
+                result_widget.update(f"[#D14D41]Error:[/]\n{display}")
+            elif result.get("missing_endpoint"):
+                result_widget.update("[#D0A215]Review endpoint not available[/]")
+            elif status >= 400:
+                result_widget.update(f"[#D14D41]Server returned {status}:[/]\n{display}")
+            else:
+                result_widget.update(f"[#879A39]Server response:[/]\n{display}")
+
+        elif button_id == "btn-reject":
             action = "reject"
-        else:
-            return
+            result = self.client.review_submit(run_id, action)
+            try:
+                result_widget = detail.query_one("#review-result", Static)
+            except Exception:
+                return
+            display = json.dumps(result, indent=2, default=str)
+            status = result.get("_status", 200)
+            if result.get("error_type"):
+                result_widget.update(f"[#D14D41]Error:[/]\n{display}")
+            elif result.get("missing_endpoint"):
+                result_widget.update("[#D0A215]Review endpoint not available[/]")
+            elif status >= 400:
+                result_widget.update(f"[#D14D41]Server returned {status}:[/]\n{display}")
+            else:
+                result_widget.update(f"[#879A39]Server response:[/]\n{display}")
 
-        result = self.client.review_submit(run_id, action)
-
-        try:
-            result_widget = detail.query_one("#review-result", Static)
-        except Exception:
-            return
-
-        display = json.dumps(result, indent=2, default=str)
-        status = result.get("_status", 200)
-
-        if result.get("error_type"):
-            result_widget.update(f"[#D14D41]Error:[/]\n{display}")
-        elif result.get("missing_endpoint"):
-            result_widget.update("[#D0A215]Review endpoint not available[/]")
-        elif status >= 400:
-            result_widget.update(f"[#D14D41]Server returned {status}:[/]\n{display}")
-        else:
-            result_widget.update(f"[#879A39]Server response:[/]\n{display}")
+        elif button_id.startswith("btn-execute-"):
+            result = self.client.execute_run(run_id)
+            try:
+                result_widget = detail.query_one(f"#execute-result-{run_id}", Static)
+            except Exception:
+                return
+            status = result.get("_status", 200)
+            if status >= 400 or result.get("error"):
+                error = result.get("error", "Unknown error")
+                result_widget.update(f"[#D14D41]Execution failed: {error}[/]", markup=True)
+            elif result.get("ok"):
+                job_id = result.get("job_id", "?")
+                result_widget.update(f"[#879A39]✓ Job enqueued: {job_id}[/]", markup=True)
+                if detail._trace_panel:
+                    detail._trace_panel.start_polling()
+            else:
+                result_widget.update(f"[#D0A215]Unexpected response[/]", markup=True)
 
     def action_refresh_runs(self) -> None:
         self.load_runs()

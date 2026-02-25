@@ -104,3 +104,15 @@ class LatheClient:
 
     def fs_run_files(self, run_id: str) -> Dict[str, Any]:
         return self._get(f"/fs/run/{run_id}/files")
+
+    def execute_run(self, run_id: str) -> Dict[str, Any]:
+        return self._post(f"/runs/{run_id}/execute", {})
+
+    def run_execute_status(self, run_id: str) -> Dict[str, Any]:
+        return self._get(f"/runs/{run_id}/execute")
+
+    def job_get(self, job_id: str) -> Dict[str, Any]:
+        return self._get(f"/jobs/{job_id}")
+
+    def run_tool_traces(self, run_id: str) -> Dict[str, Any]:
+        return self._get(f"/runs/{run_id}/tool_traces")
